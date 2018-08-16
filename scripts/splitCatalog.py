@@ -151,7 +151,7 @@ def split_catalogue(filein, rotate_theta=0, verbose=False):
 ### if run as an individual file then go through each non python, non subfield and non hidden file and make subfields for the remaining files
 def main(rotate_theta=0):
     ### get non subfield catalogs
-    onlyfiles = [f for f in listdir('./') if (isfile(join('./', f)) and f[0] != '.' and '.py' not in f and 'subfield' not in f)]
+    onlyfiles = [f for f in listdir('../catalogues') if (isfile(join('./', f)) and f[0] != '.' and '.py' not in f and 'subfield' not in f)]
 
     for f in onlyfiles:
         split_catalogue(f, rotate_theta, verbose=True)
