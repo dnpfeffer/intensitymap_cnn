@@ -1,9 +1,17 @@
 ### Don't save any of the catalogs, maps or luminosity functions
 *.npz
 
+### No Python intermediates
 *.ipynb_checkpoints
-
 *.pyc
+
+### No Tex intermediates
+*.aux
+*.fls
+*.log
+*.out
+*.gz
+*.fdb_latexmk
 
 # OS generated files #
 ######################

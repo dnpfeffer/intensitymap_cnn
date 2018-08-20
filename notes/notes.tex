@@ -1,0 +1,69 @@
+% \documentclass[twocolumn]{article}
+\documentclass{article}
+% \documentclass[useAMS,usenatbib]{mnras}
+\usepackage[utf8]{inputenc}
+
+\usepackage{graphicx}% Include figure files
+\usepackage{xcolor}
+\usepackage{epstopdf}% Allows eps figures
+\usepackage{float}% Better image placement
+\usepackage{enumerate}
+
+\usepackage{textcomp,gensymb}% Adds general symbols
+\usepackage{amsmath, amssymb}% Math symbols and stuff
+\usepackage{mathtools}% math things
+
+\usepackage[numbers,sort&compress]{natbib}% Hyperlink References
+\usepackage{hyperref}% Hyperlink References
+
+\newcommand{\dnp}[1]{\textcolor{cyan}{#1}}
+
+
+\title{Quick Notes about Machine Learning on Intensity Maps}
+\author{Daniel N. Pfeffer}
+\date{}
+
+\graphicspath{{images/}}
+
+\begin{document}
+% \bibliographystyle{unsrtnat}
+
+	\maketitle
+
+	\begin{abstract}
+		The idea of this project is to use machine learning on intensity maps to determine the luminosity function of the underlying halos.
+	\end{abstract}
+
+	\section{Intensity Maps Background} \label{sec:IMback}
+
+		Intensity mapping is done by looking at a given emission line.  Whatever is being traced should be emitting this line at any location where the tracer is located.  Having a higher density of the tracer would cause an increased intensity of whatever line is being looked at.  As the light travels to Earth it will get redshifted based on where it was originally emitted.  By looking at a range of frequencies one can get 3D spatial information (maps) about whatever tracer is being looked at.  
+
+		George has code to generate different halo catalogs quickly and has done so to make (as of the time of writing this part) 161 halo catalogs.  Each of these catalogs can be converted into smaller subfields as well as rotated to produce more catalogs.  With another code of George's one can convert these halo catalogs (or regions in them) into intensity maps.  We want lots of intensity maps so that we can do machine learning on the maps to determine the underlying luminosity function.
+
+	\section{Machine Learning Background} \label{sec:MLback}
+
+		I'm feeling lazy right now and don't want to fully flesh this out yet.
+
+		Machine learning can be used for lots of tings if you throw enough data at it.  
+
+		Neural networks are supposed to represent how brains and neurons work.  It is trained for a specific task and each neuron has it's own weights.  This gets very memory intensive for large networks because there can be lots of neurons.  A way around this is to use convolutional neural networks (CNN).  A CNN has filters that convolve with layers of input or neuron output and each layer has the same filter which saves on memory.  A quick Google showed these links that explain CNNs both in depth (http://cs231n.github.io/convolutional-networks/) and at a surface level (https://medium.freecodecamp.org/an-intuitive-guide-to-convolutional-neural-networks-260c2de0a050).
+
+	\section{Intensity Mapping CNN} \label{sec:cnn}
+
+		As of right now the idea is to use a CNN on simulated intensity maps to determine the luminosity function of the underlying halos that made the simulated intensity maps.  George has code to make the halo catalogs and another code to convert the catalogs into intensity maps.  I've made code to split up the catalogs into smaller subfields to match possible experiments. (\dnp{What experiments is a fov of 1.4 supposed to be for?})  I also have code that will rotate the halo catalogs before making subfields so that we have more subfields to train out network with.  George's code limlam mocker (llm) (the code that converts catalogs into intensity maps) was modified by me to also give out the luminosity function of the underlying halos.  The llm can also use different underlying halo luminosity relations to generate different maps and luminosity functions.
+
+	\section{Things to do for Dan in no particular order}
+		\begin{enumerate}
+			\item Figure out what a good frequency bin size is
+
+			\item Make maps and luminosity functions
+
+			\item Add in different halo luminosity relations to llm
+
+			\item Do some test runs with something basic
+		\end{enumerate}
+
+
+	
+% \bibliography{draft}
+\end{document}
