@@ -88,12 +88,12 @@ def cull_peakpatch_catalogue(halos,fov_x_l, fov_x_r, fov_y_l, fov_y_r, verbose=F
 def split_catalogue(filein, rotate_theta=0, verbose=False):
     ### the normal fox of the catalog is something like 11.52 degrees, but the number of halos drops off on the edges
     ### the 9.52 makes sure the edge effects are ignored
-    # fov_x  = 9.52
-    # fov_y  = 9.52
+    fov_x  = 9.52
+    fov_y  = 9.52
 
     ### debug fox size
-    fov_x  = 3.0
-    fov_y  = 3.0
+    # fov_x  = 3.0
+    # fov_y  = 3.0
 
     fov_x_subfield = 1.4
     fov_y_subfield = 1.4
@@ -151,10 +151,10 @@ def split_catalogue(filein, rotate_theta=0, verbose=False):
 ### if run as an individual file then go through each non python, non subfield and non hidden file and make subfields for the remaining files
 def main(rotate_theta=0):
     ### get non subfield catalogs
-    onlyfiles = [f for f in listdir('../catalogues') if (isfile(join('./', f)) and f[0] != '.' and '.py' not in f and 'subfield' not in f)]
+    onlyfiles = [f for f in listdir('../catalogues') if (isfile(join('../catalogues', f)) and f[0] != '.' and '.py' not in f and 'subfield' not in f)]
 
     for f in onlyfiles:
-        split_catalogue(f, rotate_theta, verbose=True)
+        split_catalogue('../catalogues/' + f, rotate_theta, verbose=True)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

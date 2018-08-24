@@ -12,7 +12,7 @@ def makeLumFunc(halos):
     lco = np.delete(halos.Lco, index)
 
     ### generate the histogram
-    vals, bins = np.histogram(lco, bins=np.logspace(np.log10(min(lco)),np.log10(max(lco)), 50))
+    vals, bins = np.histogram(lco, bins=np.logspace(0,7, 50))
 
     ### needed arrays for the actual luminosity function
     lFunc = [0]*len(vals)
@@ -117,4 +117,58 @@ def makeCatdMaps(params, catalogList, catLoc, mapLoc, verbose=False):
 def setParams(paramsDict, params):
     for key, val in paramsDict.items():
         setattr(params, key, val)
+    return(params)
+
+### make a paramter object from a dict
+class params(object):
+    def __init__(self,d):
+        self.__dict__ = d
+
+### make a default parameter object
+def defaultParams():
+    paramsDict = {}
+    catName = 'COMAP_z2.39-3.44_1140Mpc_seed_13579_rotate_0_subfield_0.npz'
+    ### get the map and catalog output file name
+    paramsDict['halo_catalogue_file'] = '../catalogues/'+ catName
+    paramsDict['map_output_file'] = '../maps/' + catName
+
+    ### halo luminosity function
+    paramsDict['model'] = 'Li'
+    paramsDict['coeffs'] = [0.0, 1.37, -1.74, 0.3, 0.3]
+    paramsDict['min_mass'] = 2.5e10
+
+    ### map parameters
+    paramsDict['nu_rest'] = 115.27
+    paramsDict['nu_i'] = 34.
+    paramsDict['nu_f'] = 26.
+    paramsDict['nmaps'] = 100
+    paramsDict['fov_x'] = 1.4
+    paramsDict['fov_y'] = 1.4
+    paramsDict['npix_x'] = 256
+    paramsDict['npix_y'] = 256
+
+    ### Plot parameters
+    paramsDict['plot_cube'] = True
+    paramsDict['plot_pspec'] = True
+
+    param = params(paramsDict)
+
+    return(param)
+
+### function to get non-default parameters
+### model and coeffs have default values, but the other ones do not
+def getParams(haloCat, mapFile, model='Li', coeffs=None, **kwargs):
+    params = defaultParams()
+    params.halo_catalogue_file = haloCat
+    params.map_output_file = mapFile
+    params.model=model
+    params.coeffs=coeffs
+
+    if kwargs is not None:
+        for key, value in kwargs.items():
+            if key in params.__dict__:
+                params.__dict__[key] = value
+            else:
+                print('Field {} does not exist in the parameter object'.format(key))
+
     return(params)

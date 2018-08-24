@@ -1,5 +1,6 @@
-### Don't save any of the catalogs, maps or luminosity functions
+### Don't save any of the catalogs, maps, luminosity functions or cnn models
 *.npz
+*.h5
 
 ### No Python intermediates
 *.ipynb_checkpoints

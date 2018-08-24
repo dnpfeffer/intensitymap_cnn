@@ -102,4 +102,3 @@ def loadDirNpzs(loc):
     ### remove duplicates
     names = list(set(names))
     return(names)
-
