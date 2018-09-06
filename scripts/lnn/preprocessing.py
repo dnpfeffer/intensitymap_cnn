@@ -40,3 +40,11 @@ def fileToMapAndLum(fName):
 def utf8FileToMapAndLum(fName):
     mapData, lumData = fileToMapAndLum(fName.decode('utf-8'))
     return(mapData, lumData)
+
+### function to convert a utf-8 basename into the map map_cube and the makeLumFunc
+def utf8FileToMapAndLum3D(fName):
+    mapData, lumData = fileToMapAndLum(fName.decode('utf-8'))
+    ### make sure to reshape the map data for the 3D convolutions
+    mapData = mapData.reshape(len(mapData), len(mapData[0]), len(mapData[0][0]), 1)
+
+    return(mapData, lumData)

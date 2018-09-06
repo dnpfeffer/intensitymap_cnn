@@ -41,7 +41,7 @@ def makeMapAndLumFunc(params, verbose=False):
         llm.write_time('Starting Line Intensity Mapper')
 
     ### Setup maps to output
-    mapinst   = llm.params_to_mapinst(params);
+    mapinst   = llm.params_to_mapinst(params)
 
     ### Load halos from catalogue
     halos, cosmo = llm.load_peakpatch_catalogue(params.halo_catalogue_file, verbose=llm.debug.verbose)
