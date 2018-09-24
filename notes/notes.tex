@@ -52,19 +52,45 @@
 
 	\section{Intensity Mapping CNN} \label{sec:cnn}
 
-		As of right now the idea is to use a CNN on simulated intensity maps to determine the luminosity function of the underlying halos that made the simulated intensity maps.  George has code to make the halo catalogs and another code to convert the catalogs into intensity maps.  I've made code to split up the catalogs into smaller subfields to match possible experiments. (\dnp{What experiments is a fov of 1.4 supposed to be for?})  I also have code that will rotate the halo catalogs before making subfields so that we have more subfields to train out network with.  George's code limlam mocker (llm) (the code that converts catalogs into intensity maps) was modified by me to also give out the luminosity function of the underlying halos.  The llm can also use different underlying halo luminosity relations to generate different maps and luminosity functions.
+		As of right now the idea is to use a CNN on simulated intensity maps to determine the luminosity function of the underlying halos that made the simulated intensity maps.  George has code to make the halo catalogs and another code to convert the catalogs into intensity maps.  I've made code to split up the catalogs into smaller subfields to match possible experiments.  I also have code that will rotate the halo catalogs before making subfields so that we have more subfields to train out network with.  George's code limlam mocker (llm) (the code that converts catalogs into intensity maps) was modified by me to also give out the luminosity function of the underlying halos.  The llm can also use different underlying halo luminosity relations to generate different maps and luminosity functions.
+
+		Originally the CNN was trained on converting an intensity map into \(\log dN/dL\) instead of just \(dN/dL\).  This was done originally to prevent having such a large range of output values could be hard to train.
+
+		As of right now I have a trained network that is 4 layers that trained for 100 epochs of 400 maps apiece.  Each layer is a 3D convolution with kernel size 5 and stride 1 followed by a max pooling 3D of size 2 and stride 2.  The first layer has 32 filters, followed by 64, 128 and 256.  Following the convolutional layers the network is flattened and then has a dense layer with 1000 neurons.  The final layer is another dense layer with a neuron for each point in the luminosity function we want.  Currently I take 50 points of the luminosity function.  
+
+		\dnp{Should get plots for accuracy and loss as a function of time, but forgot to add that functionality to the CNN when I first ran it}.  The network took under 30 hours to train.  Figures \ref{fig:CNN_test1} and \ref{fig:CNN_test1_ratio} show the result of the CNN on some random map.  In all luminosity bins the CNN luminosity function is within a couple of percent of the underlying one.
+
+		\begin{figure}[H]
+			\centering \label{fig:CNN_test1}
+			\includegraphics[width=0.8\textwidth]{CNN_test1.pdf}
+			\caption{Plot showing the comparison of the output of the 4 layer CNN to the expected result of the underlying luminosity function that made the intensity map.}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering \label{fig:CNN_test1_ratio}
+			\includegraphics[width=0.8\textwidth]{CNN_test1_ratio.pdf}
+			\caption{Plot showing the ratio of the CNN luminosity function over the underlying luminosity function.}
+		\end{figure}
 
 	\section{Things to do for Dan in no particular order}
 		\begin{enumerate}
 			\item Figure out what a good frequency bin size is
 
-			\item \sout{Make maps and luminosity functions} Have did this for some maps and have the ability to do this for more
+			\item \sout{Make maps and luminosity functions} Have done this for some maps and have the ability to do this for more
 
 			\item Add in different halo luminosity relations to llm
 
 			\item \sout{Do some test runs with something basic}
 
-			\item Make an actual CNN and try training it for an extended period of time
+			\item \sout{Make an actual CNN and try training it for an extended period of time}
+
+			\item \sout{Get GPUs working correctly}
+
+			\item Train on actual luminosity function instead of log(luminosity function)
+
+			\item Get CNN to record loss and metric as it trains
+
+			\item Make lots of maps on MARCC to train with
 		\end{enumerate}
 
 

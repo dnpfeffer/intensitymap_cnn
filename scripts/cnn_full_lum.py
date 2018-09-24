@@ -74,16 +74,21 @@ model2.compile(loss=keras.losses.logcosh,
 ### Set up checkpoints to save the model
 ###########################
 callBackPeriod = 10
-filePath = modelLoc + 'my_model_gpu_2_temp.hdf5'
+filePath = modelLoc + 'my_model_full_lum_gpu_temp.hdf5'
 checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='val_loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
-callbacks_list = [checkpoint]
 
 class LossHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
         self.losses = []
+        self.mean_squared_error = []
 
     def on_epoch_end(self, batch, logs={}):
         self.losses.append(logs.get('loss'))
+        self.mean_squared_error.append(logs.get('mean_squared_error'))
+
+history = LossHistory()
+
+callbacks_list = [checkpoint, history]
 
 ###########################
 ### Start Training the network
@@ -98,13 +103,13 @@ base = [mapLoc + s for s in subFields]
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLogLum3D, [item], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum3D, [item], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
 model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks_list, verbose=1)
 
-model2.save(modelLoc + 'my_model_gpu_2.hdf5')
+model2.save(modelLoc + 'my_model_full_lum_gpu.hdf5')
 
 
 
