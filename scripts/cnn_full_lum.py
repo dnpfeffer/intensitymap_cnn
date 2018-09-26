@@ -66,7 +66,7 @@ model2.add(keras.layers.Dense(1000, activation='relu'))
 ### finish it off with a dense layer with the number of output we want for our luminosity function
 model2.add(keras.layers.Dense(lum_func_size, activation='linear'))
 
-model2.compile(loss=keras.losses.logcosh,
+model2.compile(loss=keras.losses.msle,
               optimizer=keras.optimizers.SGD(),
               metrics=[keras.metrics.mse])
 
@@ -89,6 +89,7 @@ class LossHistory(keras.callbacks.Callback):
 history = LossHistory()
 
 callbacks_list = [checkpoint, history]
+#callbacks_list = [checkpoint]
 
 ###########################
 ### Start Training the network

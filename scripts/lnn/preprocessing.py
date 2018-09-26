@@ -20,6 +20,14 @@ def fileToLum(fName):
 
     return(data)
 
+### function to take the lumInfo and get just the luminosity function from it
+def justLumFunc(lumData):
+	lumData2 = []
+	for l in lumData:
+		lumData2.append(float(l))
+
+	return(lumData2) 
+
 ### function to take the luminosity function and take the log10 of it
 ### convert 0's to 1's so that there are no nans
 def logLumFunc(lumData):
@@ -36,7 +44,7 @@ def logLumFunc(lumData):
 def fileToMapAndLum(fName):
     maps, lumInfo = loadMapAndLum(fName)
     mapData = maps['map_cube']
-    lumData = lumInfo['lumFunc']
+    lumData = justLumFunc(lumInfo['lumFunc'])
 
     return(mapData, lumData)
 
