@@ -26,7 +26,8 @@ def Mhalo_to_Lco(halos, model, coeffs, **kw):
         None for default coeffs
     """
     dict = {'Li':          Mhalo_to_Lco_Li,
-            'Padmanabhan': Mhalo_to_Lco_Padmanabhan}
+            'Padmanabhan': Mhalo_to_Lco_Padmanabhan,
+            'Breysse':     Mhalo_to_Lco_Breysse}
 
     if model in dict.keys():
         return dict[model](halos, coeffs)
@@ -118,6 +119,23 @@ def get_sfr_table():
                                                         kx=1, ky=1)
     return sfr_interp_tab
 
+def Mhalo_to_Lco_Breysse(halos, coeffs):
+    """
+    halo mass to SFR to L_CO
+    following the Breysse et al 2015 model
+    arXiv 1503.05202
+    """
+    # A varies between 6.24e-7 and 9.6e-6 (arxiv:1405.0489), b varies between 0.8 and 1.2 (Direct from Pat)
+    if coeffs is None:
+        A,b = (2e-6,1.0)
+    else:
+        A,b = coeffs
+
+    hm = halos.M
+
+    Lco = A * hm**b
+
+    return Lco
 
 def add_log_normal_scatter(data,dex):
     """

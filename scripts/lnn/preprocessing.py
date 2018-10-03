@@ -26,7 +26,7 @@ def justLumFunc(lumData):
 	for l in lumData:
 		lumData2.append(float(l))
 
-	return(lumData2) 
+	return(lumData2)
 
 ### function to take the luminosity function and take the log10 of it
 ### convert 0's to 1's so that there are no nans
