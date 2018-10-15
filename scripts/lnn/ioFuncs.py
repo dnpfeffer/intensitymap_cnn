@@ -39,7 +39,8 @@ def saveLumFunc(lumInfo, loc='.', name='test_lum.npz'):
     ### save the file
     np.savez(str(fileName),
         logBinCent  =   lumInfo[0],
-        lumFunc     =   lumInfo[1])
+        numberCt    =   lumInfo[1],
+        lumFunc     =   lumInfo[2])
 
     return()
 
