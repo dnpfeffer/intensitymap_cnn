@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from .ioFuncs import *
 
@@ -12,7 +13,7 @@ def makeLumFunc(halos):
     lco = np.delete(halos.Lco, index)
 
     ### generate the histogram
-    vals, bins = np.histogram(lco, bins=np.logspace(0,7, 50))
+    vals, bins = np.histogram(lco, bins=np.logspace(3.5,7, 50))
 
     ### needed arrays for the actual luminosity function
     lFunc = [0]*len(vals)
@@ -31,7 +32,7 @@ def makeLumFunc(halos):
         # lCent[i] = (bins[i] + bins[i+1])/2
 
     ### return bin centers and luminosity function values
-    return([logLCent, lFunc])
+    return([logLCent, lFunc, vals])
 
 ### function to make a map given a set of parameters
 def makeMapAndLumFunc(params, verbose=False):
@@ -172,3 +173,126 @@ def getParams(haloCat, mapFile, model='Li', coeffs=None, **kwargs):
                 print('Field {} does not exist in the parameter object'.format(key))
 
     return(params)
+
+### function to make a random map given a selection of catalogs, the catalog location and the location to store the map
+def make_random_map(catalogs, haloLoc, mapLoc):
+    ### choose a random catalog
+    catalog = random.choice(catalogs)
+    ### make the random map
+    make_random_map_from_cat(catalog, haloLoc, mapLoc)
+
+    return()
+
+### function to make a random map given a specific catalog, catalog location and location to store the map
+def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False):
+    ### make a random paramDict
+    paramDict = {}
+    paramDict = make_paramDict(paramDict=paramDict, model=model, default=default)
+
+    ### make sure the map directory exists
+    checkDirectoryPath(mapLoc)
+
+    ### set the parameters for limlam_mocker
+    param = getParams(haloLoc + catalog, mapLoc + catalog, **paramDict)
+
+    ### get a file name showing the info about model and coeffs used
+    file_name = coeffs_to_file_name(param.model, param.coeffs, mapLoc, catalog)
+    param.map_output_file = file_name
+    # print(param.halo_catalogue_file, '\n', param.map_output_file, '\n', param.model, '\n', param.coeffs)
+    makeAndSaveMapAndLumFunc(param, verbose=False)
+
+### function to make a random paramDict for a limlam_mocker run
+### randomizes the model and the values of the coefficients in the model if requested
+def make_paramDict(paramDict, model=None, default=False):
+    ### list of models
+    model_list = ['Li', 'Padmanabhan', 'Breysse']
+    means = []
+    sig = []
+
+    ### randomly pick a model if none is given
+    if model == None:
+        model = random.choice(model_list)
+
+    ### set up the coefficients for the model
+    if model == 'Li':
+        ### parameter info from arxiv:1503.08833
+        ### log_delta_mf, alpha, beta, sigma_sfr (>0), sigma_lc0 (>0)
+        means = [0.0, 1.37,-1.74, 0.3, 0.3]
+        ### loose priors
+        sig = [0.3, 0.37, 3.74, 0.1, 0.1]
+        ### stronger priors
+        #sig = [0.3, 0.04, 0.4, 0.1, 0.1]
+    elif model == 'Padmanabhan':
+        ### parameter info from arxiv:1706.01471
+        ### m10, m11, n10, n11, b10, b11, y10, y11
+        means = [4.17e12, -1.17, 0.0033, 0.04, 0.95, 0.48, 0.66, -0.33]
+        ### priors
+        sig = [2.03e12, 0.85, 0.0016, 0.03, 0.46, 0.35, 0.32, 0.24]
+    elif model == 'Breysse':
+        ### parameter info from arxiv:1706.01471
+        ### A, b
+        means = [2e-6, 1.0]
+        ### priors
+        sig = [5e-7, 0.125]
+    else:
+        sys.exit('\n\n\tYour model, '+model+', does not seem to exist\n\t\tPlease check src/halos_to_luminosity.py in limlam_mocker to add it\n\n')
+
+    ### set the model parameter for limlam
+    paramDict['model'] = model
+
+    ### if default is set, use the default values
+    if default:
+        coeffs = means
+    ### if default is not set, find a random realization of the given model's parameters
+    else:
+        coeffs = [np.random.normal(x,y) for x,y in zip(means, sig)]
+
+        ### make sure last two parameters in the Li model are non-negative
+        if model == 'Li':
+            for i in [-1,-2]:
+                if coeffs[i] < 0:
+                    coeffs[i] = 0
+        if model == 'Padmanabhan':
+            for i in [0]:
+                if coeffs[i] <= 0:
+                    coeffs[i] = 1e-20
+
+    ### set coeffs parameter for limlam
+    paramDict['coeffs'] = coeffs
+
+    return(paramDict)
+
+### function to convert model and catalog info into a map filename
+### filenames are given catalog info __ model _ coeffs
+def coeffs_to_file_name(model, coeffs, mapLoc, catalog):
+    file_name = '__' + model + '_'
+
+    ### put coeffs into the filename
+    for coeff in coeffs:
+        file_name += '{:.3e}_'.format(coeff)
+
+    ### form the full filename
+    full_file_name = mapLoc + catalog[:-4] + file_name[:-1] + catalog[-4:]
+
+    return(full_file_name)
+
+### function to convert a path to a map into info about the map
+def path_to_coeffs(path):
+    ### get the filename
+    file_name = path.split('/')[-1]
+    ### get info about the filename
+    model, coeffs = file_name_to_coeffs(file_name)
+
+    return(model, coeffs)
+
+### function to convert a filename for a map into info about the map
+def file_name_to_coeffs(file_name):
+    ### split catalog and model info
+    cat, lum_info = file_name.split('__')
+
+    ### split model info up and get the specific model as well as coeffs used
+    lum_list = lum_info[:-4].split('_')
+    model = lum_list[0]
+    coeffs = list(map(float, lum_list[1:]))
+
+    return(model, coeffs)
