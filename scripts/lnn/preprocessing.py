@@ -26,7 +26,7 @@ def justLumFunc(lumData):
 	for l in lumData:
 		lumData2.append(float(l))
 
-	return(lumData2)
+	return(np.array(lumData2))
 
 ### function to take the luminosity function and take the log10 of it
 ### convert 0's to 1's so that there are no nans
@@ -38,21 +38,21 @@ def logLumFunc(lumData):
         else:
             logLumData.append(np.log10(l))
 
-    return(logLumData)
+    return(np.array(logLumData))
 
 ### function to convert a basename into the map and map_cube and the makeLumFunc
 def fileToMapAndLum(fName):
     maps, lumInfo = loadMapAndLum(fName)
-    mapData = maps['map_cube']
-    lumData = justLumFunc(lumInfo['lumFunc'])
+    mapData = maps['map_cube'].astype(np.float32)
+    lumData = justLumFunc(lumInfo['lumFunc']).astype(np.float32)
 
     return(mapData, lumData)
 
 ### function to convert a basename into the map and map_cube and the makeLogLumFunc
 def fileToMapAndLogLum(fName):
     maps, lumInfo = loadMapAndLum(fName)
-    mapData = maps['map_cube']
-    lumData = logLumFunc(lumInfo['lumFunc'])
+    mapData = maps['map_cube'].astype(np.float32)
+    lumData = logLumFunc(lumInfo['lumFunc']).astype(np.float32)
 
     return(mapData, lumData)
 

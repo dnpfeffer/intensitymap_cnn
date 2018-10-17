@@ -22,8 +22,8 @@ from tensorflow import keras
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
 ### continue training an old network or start a new one
-continue_training = True 
-continue_training_model_loc = 'my_model_full_lum_gpu_5_layer_temp.hdf5'
+continue_training = False
+continue_training_model_loc = 'my_model_log_lum_gpu_5_layer_temp.hdf5'
 
 ### locations
 mapLoc = '../../maps/test/'
@@ -39,7 +39,7 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'my_model_full_lum_gpu_5_layer'
+fileName = 'my_model_log_lum_gpu_5_layer'
 
 ### callBackPeriod for checkpoints and saving things midway through
 callBackPeriod = 10
@@ -115,7 +115,7 @@ if make_model:
 ### Set up checkpoints to save the model
 ###########################
 filePath = modelLoc + fileName + '_temp.hdf5'
-checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='val_loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
+checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
 
 class LossHistory(keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
@@ -139,7 +139,7 @@ base = [mapLoc + s for s in subFields]
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum3D, [item], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLumLog3D, [item], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
