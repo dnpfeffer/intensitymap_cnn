@@ -13,7 +13,7 @@ def makeLumFunc(halos):
     lco = np.delete(halos.Lco, index)
 
     ### generate the histogram
-    vals, bins = np.histogram(lco, bins=np.logspace(0,7, 50))
+    vals, bins = np.histogram(lco, bins=np.logspace(3.5,7, 50))
 
     ### needed arrays for the actual luminosity function
     lFunc = [0]*len(vals)
