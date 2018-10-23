@@ -17,16 +17,16 @@ import lnn as lnn
 
 import tensorflow as tf
 from tensorflow import keras
+from keras.backend.tensorflow_backend import set_session
 
 ########################
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
 ### continue training an old network or start a new one
 continue_training = False
-continue_training_model_loc = 'my_model_log_lum_gpu_4_layer_temp.hdf5'
 
 ### locations
-mapLoc = '../../maps/test/'
+mapLoc = '../../maps2/basic_Li/'
 catLoc = '../../catalogues/'
 modelLoc = '../../models/'
 
@@ -39,19 +39,33 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'my_model_log_lum_gpu_4_layer'
+fileName = 'full_lum_5_layer_model'
+continue_training_model_loc = fileName + '_temp.hdf5'
 
 ### callBackPeriod for checkpoints and saving things midway through
 callBackPeriod = 10
 
 ### number of maps to look at in a batch
-batch_size = 2
-steps_per_epoch = 200
+batch_size = 8
+steps_per_epoch = 50
 epochs = 100
+
+### number of gpus
+numb_gpu = 4
+
+### dropout rate for training
+droprate = 0.2
+
+### variables for what we are training on
+ThreeD = True
+luminosity_byproduct = 'basic'
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.4
+config.gpu_options.per_process_gpu_memory_fraction = 1.0
+
+#sess = tf.Session(config=config)
+#set_session(sess)
 
 #########################
 ### Set Up the Model
@@ -71,45 +85,57 @@ if make_model:
     model2 = keras.Sequential()
 
     ### convolutional layer
-    model2.add(keras.layers.Conv3D(32, kernel_size=(5,5,5), strides=(1,1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps, 1)))
+    model2.add(keras.layers.Conv3D(16, kernel_size=(5,5,5), strides=(1,1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps, 1)))
+    model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
     #model2.add(keras.layers.Conv3D(32, kernel_size=(2,2,2), strides=(2,2,2), activation='relu'))
     model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
+    model2.add(keras.layers.Dropout(droprate))
+
+    ### convolutional layer
+    model2.add(keras.layers.Conv3D(32, (5,5,5), activation='relu'))
+    model2.add(keras.layers.BatchNormalization())
+    ### use a convolution instead of a pool that acts like a pool
+    #model2.add(keras.layers.Conv3D(64, kernel_size=(2,2,2), strides=(2,2,2), activation='relu'))
+    model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
+    model2.add(keras.layers.Dropout(droprate))
 
     ### convolutional layer
     model2.add(keras.layers.Conv3D(64, (5,5,5), activation='relu'))
+    model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
     #model2.add(keras.layers.Conv3D(64, kernel_size=(2,2,2), strides=(2,2,2), activation='relu'))
     model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
+    model2.add(keras.layers.Dropout(droprate))
 
     ### convolutional layer
     model2.add(keras.layers.Conv3D(128, (5,5,5), activation='relu'))
+    model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
     #model2.add(keras.layers.Conv3D(64, kernel_size=(2,2,2), strides=(2,2,2), activation='relu'))
     model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
+    model2.add(keras.layers.Dropout(droprate))
 
     ### convolutional layer
-    model2.add(keras.layers.Conv3D(256, (5,5,5), activation='relu'))
+    model2.add(keras.layers.Conv3D(256, (5,5,1), activation='relu'))
+    model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
     #model2.add(keras.layers.Conv3D(64, kernel_size=(2,2,2), strides=(2,2,2), activation='relu'))
-    model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2)))
-
-    #### convolutional layer
-    #model2.add(keras.layers.Conv3D(512, (5,5,1), activation='relu'))
-    #### use a convolution instead of a pool that acts like a pool
-    ##model2.add(keras.layers.Conv3D(64, kernel_size=(2,2,2), strides=(2,2,2), activation='relu'))
-    #model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,1), strides=(2,2,1)))
+    model2.add(keras.layers.MaxPooling3D(pool_size=(2,2,1), strides=(2,2,1)))
+    model2.add(keras.layers.Dropout(droprate))
 
     ### flatten the network
     model2.add(keras.layers.Flatten())
     ### make a dense layer for the second to last step
-    model2.add(keras.layers.Dense(1000, activation='relu'))
+    model2.add(keras.layers.Dense(500, activation='relu'))
     ### finish it off with a dense layer with the number of output we want for our luminosity function
     model2.add(keras.layers.Dense(lum_func_size, activation='linear'))
 
     model2.compile(loss=keras.losses.msle,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
+
+model2.summary()
 
 ###########################
 ### Set up checkpoints to save the model
@@ -139,9 +165,15 @@ base = [mapLoc + s for s in subFields]
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, 'log', True], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
+
+model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
+model2.compile(loss=keras.losses.msle,
+                  optimizer=keras.optimizers.SGD(),
+                  metrics=[keras.metrics.mse])
+model2.summary()
 
 history = model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks_list, verbose=1)
 
@@ -149,8 +181,6 @@ model2.save(modelLoc + fileName +  '.hdf5')
 
 with open(modelLoc + fileName + '_history', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
-
-
 
 
 

@@ -139,7 +139,7 @@ base = [mapLoc + s for s in subFields]
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum3D, [item], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, 'basic', True], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 

@@ -90,16 +90,16 @@ def fileToLum(fName):
 def lumFuncByproduct(lumInfo, lumByproduct='basic'):
     lumResult = []
     for i in range(len(lumInfo['lumFunc'])):
-    l = lumInfo['lumFunc'][i]
+        l = lumInfo['lumFunc'][i]
         if lumByproduct == 'basic':
-            lumResult.append(l)
+            lumResult.append(float(l))
         elif lumByproduct == 'log':
             if l == 0:
-                lumResult.append(0)
+                lumResult.append(0.0)
             else:
-                lumResult.append(np.log10(l))
+                lumResult.append(np.log10(float(l)))
         elif lumByproduct == 'basicL':
-            lumResult.append(l * lumInfo['logBinCent'])
+            lumResult.append(float(l * lumInfo['logBinCent'][i]))
         else:
             pass
 
@@ -115,7 +115,8 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
 
 ### function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
 def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False):
-    mapData, lumData = fileToMapAndLogLum(fName.decode('utf-8'), lumByproduct)
+    lumByproduct = lumByproduct.decode("utf-8")
+    mapData, lumData = fileToMapAndLum(fName.decode('utf-8'), lumByproduct)
 
     if ThreeD:
         ### make sure to reshape the map data for the 3D convolutions
