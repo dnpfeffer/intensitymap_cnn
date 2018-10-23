@@ -81,7 +81,7 @@ if continue_training:
         print('Could not load model in {}.\nOpting to train a new model instead'.format(modelLoc + continue_training_model_loc))
         fileName = fileName + '2'
 
-if make_model: 
+if make_model:
     model2 = keras.Sequential()
 
     ### convolutional layer
@@ -169,20 +169,15 @@ dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [it
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
-model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
-model2.compile(loss=keras.losses.msle,
+multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
+multi_gpu_model2.compile(loss=keras.losses.logcosh,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
-model2.summary()
+multi_gpu_model2.summary()
 
-history = model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks_list, verbose=1)
+history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks_list, verbose=1)
 
 model2.save(modelLoc + fileName +  '.hdf5')
 
 with open(modelLoc + fileName + '_history', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
-
-
-
-
-
