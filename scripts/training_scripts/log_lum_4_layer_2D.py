@@ -67,9 +67,6 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction = 1.0
 
-#sess = tf.Session(config=config)
-#set_session(sess)
-
 #########################
 ### Set Up the Model
 #########################
@@ -192,7 +189,7 @@ multi_gpu_model2.compile(loss=keras.losses.logcosh,
                   metrics=[keras.metrics.mse])
 multi_gpu_model2.summary()
 
-history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, 
+history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch,
                         validation_data = dataset_val, validation_steps=3,
                         callbacks=callbacks_list, verbose=1)
 

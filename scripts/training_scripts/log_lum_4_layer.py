@@ -64,9 +64,6 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction = 1.0
 
-#sess = tf.Session(config=config)
-#set_session(sess)
-
 #########################
 ### Set Up the Model
 #########################
@@ -161,7 +158,11 @@ callbacks_list = [checkpoint, history]
 ### Start Training the network
 ###########################
 subFields = lnn.loadBaseFNames(mapLoc)
-base = [mapLoc + s for s in subFields]
+np.random.shuffle(subFields)
+
+valPoint = int(len(subFields)*valPer)
+base = [mapLoc + s for s in subFields[:valPoint]]
+base_val = [mapLoc + s for s in subFields[valPoint:]]
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
@@ -169,15 +170,23 @@ dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [it
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
+dataset_val = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base_val))
+dataset_val = dataset_val.shuffle(buffer_size=len(base_val))
+dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
+dataset_val = dataset_val.repeat()
+dataset_val = dataset_val.batch(batch_size)
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
 multi_gpu_model2.compile(loss=keras.losses.logcosh,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
 multi_gpu_model2.summary()
 
-history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks_list, verbose=1)
+history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch,
+                        validation_data = dataset_val, validation_steps=3,
+                        callbacks=callbacks_list, verbose=1)
 
 model2.save(modelLoc + fileName +  '.hdf5')
+model2.save_weights(modelLoc + fileName + '_weights.hdf5')
 
 with open(modelLoc + fileName + '_history', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
