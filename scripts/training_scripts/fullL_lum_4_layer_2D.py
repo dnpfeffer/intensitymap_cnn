@@ -39,7 +39,7 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'log_lum_4_layer_2D_model_long'
+fileName = 'fullL_lum_4_layer_2D_model_long'
 continue_training_model_loc = fileName + '_temp.hdf5'
 
 ### callBackPeriod for checkpoints and saving things midway through
@@ -61,7 +61,7 @@ valPer = 0.2
 
 ### variables for what we are training on
 ThreeD = False
-luminosity_byproduct = 'log'
+luminosity_byproduct = 'basicL'
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -134,7 +134,7 @@ if make_model:
     ### finish it off with a dense layer with the number of output we want for our luminosity function
     model2.add(keras.layers.Dense(lum_func_size, activation='linear'))
 
-    model2.compile(loss=keras.losses.logcosh,
+    model2.compile(loss=keras.metrics.mse,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
 
@@ -187,7 +187,7 @@ dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
-multi_gpu_model2.compile(loss=keras.losses.logcosh,
+multi_gpu_model2.compile(loss=keras.metrics.mse,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
 multi_gpu_model2.summary()

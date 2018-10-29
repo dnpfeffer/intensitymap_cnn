@@ -39,7 +39,7 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'log_lum_4_layer_2D_model_long'
+fileName = 'log_lum_5_layer_2D_model_long'
 continue_training_model_loc = fileName + '_temp.hdf5'
 
 ### callBackPeriod for checkpoints and saving things midway through
@@ -119,13 +119,13 @@ if make_model:
     # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
     model2.add(keras.layers.Dropout(droprate))
 
-    # ### convolutional layer
-    # model2.add(keras.layers.Conv2D(256, (5,5), activation='relu'))
-    # model2.add(keras.layers.BatchNormalization())
-    # ### use a convolution instead of a pool that acts like a pool
-    # model2.add(keras.layers.Conv2D(256, kernel_size=(2,2), strides=(2,2), activation='relu'))
-    # # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
-    # model2.add(keras.layers.Dropout(droprate))
+    ### convolutional layer
+    model2.add(keras.layers.Conv2D(256, (5,5), activation='relu'))
+    model2.add(keras.layers.BatchNormalization())
+    ### use a convolution instead of a pool that acts like a pool
+    model2.add(keras.layers.Conv2D(256, kernel_size=(2,2), strides=(2,2), activation='relu'))
+    # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
+    model2.add(keras.layers.Dropout(droprate))
 
     ### flatten the network
     model2.add(keras.layers.Flatten())

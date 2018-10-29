@@ -23,7 +23,7 @@ from keras.backend.tensorflow_backend import set_session
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
 ### continue training an old network or start a new one
-continue_training = False
+continue_training = True
 
 ### locations
 mapLoc = '../../maps2/basic_Li/'
@@ -48,7 +48,7 @@ callBackPeriod = 10
 ### number of maps to look at in a batch
 batch_size = 4
 steps_per_epoch = 100
-epochs = 100
+epochs = 150
 
 ### number of gpus
 numb_gpu = 4
