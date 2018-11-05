@@ -23,7 +23,7 @@ from keras.backend.tensorflow_backend import set_session
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
 ### continue training an old network or start a new one
-continue_training = False
+continue_training = True
 
 ### locations
 mapLoc = '../../maps2/basic_Li/'
@@ -39,16 +39,16 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'log_lum_5_layer_2D_model_long'
-continue_training_model_loc = fileName + '_temp.hdf5'
+fileName = 'log_lum_5_layer_2D_model'
+continue_training_model_loc = fileName + '.hdf5'
 
 ### callBackPeriod for checkpoints and saving things midway through
 callBackPeriod = 10
 
 ### number of maps to look at in a batch
-batch_size = 40
-steps_per_epoch = 40
-epochs = 150
+batch_size = 4 #40
+steps_per_epoch = 4 #40
+epochs = 10 #300
 
 ### number of gpus
 numb_gpu = 4
@@ -143,7 +143,7 @@ model2.summary()
 ###########################
 ### Set up checkpoints to save the model
 ###########################
-filePath = modelLoc + fileName + '_temp.hdf5'
+filePath = modelLoc + fileName + '_test_temp.hdf5'
 checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
 
 class LossHistory(keras.callbacks.Callback):
@@ -162,7 +162,6 @@ class LossHistory(keras.callbacks.Callback):
 history = LossHistory()
 
 callbacks_list = [checkpoint, history]
-#callbacks_list = [checkpoint]
 
 ###########################
 ### Start Training the network
@@ -186,18 +185,21 @@ dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAnd
 dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
+#if continue_training:
+#multi_gpu_model2 = model2
+#else:
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
 multi_gpu_model2.compile(loss=keras.losses.logcosh,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
-multi_gpu_model2.summary()
+#multi_gpu_model2.summary()
 
 history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, 
                         validation_data = dataset_val, validation_steps=3,
                         callbacks=callbacks_list, verbose=1)
 
-model2.save(modelLoc + fileName +  '.hdf5')
-model2.save_weights(modelLoc + fileName + '_weights.hdf5')
+model2.save(modelLoc + fileName +  '_test_test.hdf5')
+model2.save_weights(modelLoc + fileName + '_test_weights.hdf5')
 
-with open(modelLoc + fileName + '_history', 'wb') as file_pi:
+with open(modelLoc + fileName + '_test_history', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)

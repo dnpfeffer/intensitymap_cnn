@@ -39,7 +39,7 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'log_lum_4_layer_2D_model_long'
+fileName = 'log_lum_4_layer_2D_model_very_long'
 continue_training_model_loc = fileName + '_temp.hdf5'
 
 ### callBackPeriod for checkpoints and saving things midway through
@@ -48,7 +48,7 @@ callBackPeriod = 10
 ### number of maps to look at in a batch
 batch_size = 40
 steps_per_epoch = 40
-epochs = 150
+epochs = 300
 
 ### number of gpus
 numb_gpu = 4

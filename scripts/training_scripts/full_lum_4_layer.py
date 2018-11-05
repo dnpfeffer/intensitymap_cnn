@@ -23,7 +23,7 @@ from keras.backend.tensorflow_backend import set_session
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
 ### continue training an old network or start a new one
-continue_training = True
+continue_training = False
 
 ### locations
 mapLoc = '../../maps2/basic_Li/'
@@ -47,7 +47,7 @@ callBackPeriod = 10
 
 ### number of maps to look at in a batch
 batch_size = 4
-steps_per_epoch = 100
+steps_per_epoch = 200
 epochs = 150
 
 ### number of gpus
@@ -55,6 +55,9 @@ numb_gpu = 4
 
 ### dropout rate for training
 droprate = 0.2
+
+### validation percent of data
+valPer = 0.2
 
 ### variables for what we are training on
 ThreeD = True
