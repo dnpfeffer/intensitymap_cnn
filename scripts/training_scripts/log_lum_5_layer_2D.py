@@ -39,16 +39,16 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'log_lum_5_layer_2D_model'
-continue_training_model_loc = fileName + '.hdf5'
+fileName = 'log_lum_5_layer_2D_model_long'
+continue_training_model_loc = fileName + '_temp.hdf5'
 
 ### callBackPeriod for checkpoints and saving things midway through
 callBackPeriod = 10
 
 ### number of maps to look at in a batch
-batch_size = 4 #40
-steps_per_epoch = 4 #40
-epochs = 10 #300
+batch_size = 40
+steps_per_epoch = 40
+epochs = 150
 
 ### number of gpus
 numb_gpu = 4
@@ -76,13 +76,18 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 make_model = True
 
 if continue_training:
+    continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
+
+    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
+
     try:
-        model2 = keras.models.load_model(modelLoc + continue_training_model_loc)
+        model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
         make_model = False
-        fileName = continue_training_model_loc[:-5]
+        fileName += '_{0}'.format(continue_count)
     except:
-        print('Could not load model in {}.\nOpting to train a new model instead'.format(modelLoc + continue_training_model_loc))
-        fileName = fileName + '2'
+        print('Could not load model in {}.\nOpting to train a new model instead'.format(modelLoc + fileName))
+        fileName = fileName + '_new'
+
 
 if make_model:
     model2 = keras.Sequential()
@@ -138,12 +143,12 @@ if make_model:
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
 
-model2.summary()
+# model2.summary()
 
 ###########################
 ### Set up checkpoints to save the model
 ###########################
-filePath = modelLoc + fileName + '_test_temp.hdf5'
+filePath = modelLoc + fileName + '_temp.hdf5'
 checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
 
 class LossHistory(keras.callbacks.Callback):
@@ -162,6 +167,7 @@ class LossHistory(keras.callbacks.Callback):
 history = LossHistory()
 
 callbacks_list = [checkpoint, history]
+#callbacks_list = [checkpoint]
 
 ###########################
 ### Start Training the network
@@ -169,37 +175,38 @@ callbacks_list = [checkpoint, history]
 subFields = lnn.loadBaseFNames(mapLoc)
 np.random.shuffle(subFields)
 
-valPoint = int(len(subFields)*valPer)
-base = [mapLoc + s for s in subFields[:valPoint]]
-base_val = [mapLoc + s for s in subFields[valPoint:]]
+# valPoint = int(len(subFields)*valPer)
+# base = [mapLoc + s for s in subFields[:valPoint]]
+# base_val = [mapLoc + s for s in subFields[valPoint:]]
+#
+# dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
+# dataset = dataset.shuffle(buffer_size=len(base))
+# dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
+# dataset = dataset.repeat()
+# dataset = dataset.batch(batch_size)
+#
+# dataset_val = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base_val))
+# dataset_val = dataset_val.shuffle(buffer_size=len(base_val))
+# dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
+# dataset_val = dataset_val.repeat()
+# dataset_val = dataset_val.batch(batch_size)
+#
+# multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
+# multi_gpu_model2.compile(loss=keras.losses.logcosh,
+#                   optimizer=keras.optimizers.SGD(),
+#                   metrics=[keras.metrics.mse])
+# multi_gpu_model2.summary()
+#
+# history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch,
+#                         validation_data = dataset_val, validation_steps=3,
+#                         callbacks=callbacks_list, verbose=1)
+#
+# model2.save(modelLoc + fileName +  '.hdf5')
+# model2.save_weights(modelLoc + fileName + '_weights.hdf5')
+#
+# with open(modelLoc + fileName + '_history', 'wb') as file_pi:
+#         pickle.dump(history.history, file_pi)
 
-dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
-dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
-dataset = dataset.repeat()
-dataset = dataset.batch(batch_size)
-
-dataset_val = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base_val))
-dataset_val = dataset_val.shuffle(buffer_size=len(base_val))
-dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
-dataset_val = dataset_val.repeat()
-dataset_val = dataset_val.batch(batch_size)
-
-#if continue_training:
-#multi_gpu_model2 = model2
-#else:
-multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
-multi_gpu_model2.compile(loss=keras.losses.logcosh,
-                  optimizer=keras.optimizers.SGD(),
-                  metrics=[keras.metrics.mse])
-#multi_gpu_model2.summary()
-
-history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per_epoch, 
-                        validation_data = dataset_val, validation_steps=3,
-                        callbacks=callbacks_list, verbose=1)
-
-model2.save(modelLoc + fileName +  '_test_test.hdf5')
-model2.save_weights(modelLoc + fileName + '_test_weights.hdf5')
-
-with open(modelLoc + fileName + '_test_history', 'wb') as file_pi:
-        pickle.dump(history.history, file_pi)
+print(modelLoc + fileName +  '.hdf5')
+print(modelLoc + fileName + '_weights.hdf5')
+print(modelLoc + fileName + '_history')

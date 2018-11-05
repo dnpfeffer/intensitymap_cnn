@@ -5,7 +5,7 @@ from limlam_mocker import limlam_mocker as llm
 
 ### used for file handeling
 from pathlib import Path
-import os
+import os, pickle
 
 ### make and save a map given a set of parameters
 def saveMapAndLum(maps, lumInfo):
@@ -103,3 +103,26 @@ def loadDirNpzs(loc):
     ### remove duplicates
     names = list(set(names))
     return(names)
+
+### function to get the names of files in the model folder that
+### match the given name
+def get_model_name_matches(modelLoc, model_name):
+    model_matches = []
+    path = Path(modelLoc)
+    for p in path.iterdir():
+        ### ignore files that begin with '.'
+        ### ignore directories
+        if p.name[0] == '.' or '/' in p.name:
+            continue
+        ### keep track of files that contain the correct name
+        if model_name in p.name:
+            model_matches.append(p.name)
+
+    ### return the names
+    return(model_matches)
+
+### function to load up the history of a model
+def load_history(history_path):
+    with open(history_path, 'rb') as pickle_file:
+        history = pickle.load(pickle_file)
+    return(history)
