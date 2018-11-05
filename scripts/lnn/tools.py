@@ -65,6 +65,37 @@ def convert_lum_to_log(lum, luminosity_product, lumLogBinCents):
 
     return(lum)
 
+### handle booleans for argument parsing
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+### make a file name from the given model information
+def make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters):
+    if luminosity_byproduct == 'log':
+        lb_string = 'log'
+    elif luminosity_byproduct == 'basic':
+        lb_string = 'full'
+    elif luminosity_byproduct == 'basicL':
+        lb_string = 'fullL'
+    else:
+        print('There should not be a way for someone to be in make_file_name without a valid luminosity_byproduct: {0}'.format(luminosity_byproduct))
+        exit(0)
+
+    if ThreeD:
+        ThreeD_string = '3D'
+    else:
+        ThreeD_string = '2D'
+
+    file_name = '{0}_lum_{1}_layer_{2}_{3}_filters_model'.format(lb_string, numb_layers, ThreeD_string, base_filters)
+
+    return(file_name)
+
+
 ###############################################################
 ### Jupyter Notebook Plotting Tools ###########################
 ###############################################################

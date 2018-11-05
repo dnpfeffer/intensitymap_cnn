@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 
+### arg parser to get command line arguments
+import argparse
+
 ### modify path to import limlam and lnn stuff
 import sys
 sys.path.append('../')
@@ -23,7 +26,7 @@ from keras.backend.tensorflow_backend import set_session
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
 ### continue training an old network or start a new one
-continue_training = True
+continue_training = False
 
 ### locations
 mapLoc = '../../maps2/basic_Li/'
@@ -59,10 +62,61 @@ droprate = 0.2
 ### validation percent of data
 valPer = 0.2
 
+### number of layers
+numb_layers = 4
+
+### base number of filters
+base_filters = 16
+
 ### variables for what we are training on
 ThreeD = False
 luminosity_byproduct = 'log'
 
+### handle the argument parsing
+parser = argparse.ArgumentParser()
+
+### handle booleans
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+### add all of the arguments
+parser.add_argument('-fn', '--file_name', default='', help='What file name to use')
+parser.add_argument('-c', '--continue_training', type=lnn.str2bool, default=continue_training, help='Should training start from scratch or continue from before')
+parser.add_argument('-bs', '--batch_size', type=int, default=batch_size, help='Batch size to use')
+parser.add_argument('-spe', '--steps_per_epoch', type=int, default=steps_per_epoch, help='Number of steps(batches) per epoch')
+parser.add_argument('-e', '--epochs', type=int, default=epochs, help='Number of epochs to train for')
+parser.add_argument('-g', '--numb_gpu', type=int, default=numb_gpu, help='Number of GPUs to use')
+parser.add_argument('-d', '--dropout', type=float, default=droprate, help='Dropout rate for each layer')
+parser.add_argument('-vp', '--validation_percent', type=float, default=valPer, help='Percent of data that is used for validation')
+parser.add_argument('-l', '--numb_layers', type=int, default=numb_layers, help='Number of layers to use')
+parser.add_argument('-f', '--base_filters', type=int, default=base_filters, help='Number of filters to use in the first layer')
+parser.add_argument('-3d', '--threeD', type=lnn.str2bool, default=ThreeD, help='Use 3D convolutions or not')
+parser.add_argument('-lb', '--luminosity_byproduct', default=luminosity_byproduct, help='What luminosity function byproduct to train on')
+
+### read in values for all of the argumnets
+args = parser.parse_args()
+fileName = args.file_name
+continue_training = args.continue_training
+batch_size = args.batch_size
+steps_per_epoch = args.steps_per_epoch
+epochs = args.epochs
+numb_gpu = args.numb_gpu
+droprate = args.dropout
+valPer = args.validation_percent
+numb_layers = args.numb_layers
+base_filters = args.base_filters
+ThreeD = args.threeD
+luminosity_byproduct = args.luminosity_byproduct
+
+if fileName == '':
+    fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
+
+### set up how much memory the gpus use
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction = 1.0
@@ -75,10 +129,24 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 #########################
 make_model = True
 
+### set which convolution to use depending on if it is 3D or not
+if ThreeD:
+    conv = keras.layers.Conv3D
+else:
+    conv = keras.layers.Conv2D
+
+### choose which loss to use
+if luminosity_byproduct == 'log':
+    loss = keras.losses.logcosh
+elif luminosity_byproduct == 'basic':
+    loss = keras.losses.msle
+elif luminosity_byproduct == 'basicL':
+    loss = keras.losses.msle
+else:
+    loss = keras.losses.mse
+
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
-
-    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
 
     try:
         model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
@@ -93,44 +161,24 @@ if make_model:
     model2 = keras.Sequential()
 
     ### convolutional layer
-    model2.add(keras.layers.Conv2D(16, kernel_size=(5,5), strides=(1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps)))
+    model2.add(conv(base_filters, kernel_size=(5,5), strides=(1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps)))
+    ### batch normalization
     model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
-    model2.add(keras.layers.Conv2D(16, kernel_size=(2,2), strides=(2,2), activation='relu'))
-    # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
+    model2.add(conv(base_filters, kernel_size=(2,2), strides=(2,2), activation='relu'))
+    ### dropout for training
     model2.add(keras.layers.Dropout(droprate))
 
-    ### convolutional layer
-    model2.add(keras.layers.Conv2D(32, (5,5), activation='relu'))
-    model2.add(keras.layers.BatchNormalization())
-    ### use a convolution instead of a pool that acts like a pool
-    model2.add(keras.layers.Conv2D(32, kernel_size=(2,2), strides=(2,2), activation='relu'))
-    # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
-    model2.add(keras.layers.Dropout(droprate))
-
-    ### convolutional layer
-    model2.add(keras.layers.Conv2D(64, (5,5), activation='relu'))
-    model2.add(keras.layers.BatchNormalization())
-    ### use a convolution instead of a pool that acts like a pool
-    model2.add(keras.layers.Conv2D(64, kernel_size=(2,2), strides=(2,2), activation='relu'))
-    # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
-    model2.add(keras.layers.Dropout(droprate))
-
-    ### convolutional layer
-    model2.add(keras.layers.Conv2D(128, (5,5), activation='relu'))
-    model2.add(keras.layers.BatchNormalization())
-    ### use a convolution instead of a pool that acts like a pool
-    model2.add(keras.layers.Conv2D(128, kernel_size=(2,2), strides=(2,2), activation='relu'))
-    # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
-    model2.add(keras.layers.Dropout(droprate))
-
-    ### convolutional layer
-    model2.add(keras.layers.Conv2D(256, (5,5), activation='relu'))
-    model2.add(keras.layers.BatchNormalization())
-    ### use a convolution instead of a pool that acts like a pool
-    model2.add(keras.layers.Conv2D(256, kernel_size=(2,2), strides=(2,2), activation='relu'))
-    # model2.add(keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2)))
-    model2.add(keras.layers.Dropout(droprate))
+    ### loop through and add layers
+    for i in range(2, numb_layers+1):
+        ### convolutional layer
+        model2.add(conv(base_filters*(2**(i-1)), (5,5), activation='relu'))
+        ### batch normalization
+        model2.add(keras.layers.BatchNormalization())
+        ### use a convolution instead of a pool that acts like a pool
+        model2.add(conv(base_filters*(2**(i-1)), kernel_size=(2,2), strides=(2,2), activation='relu'))
+        ### dropout for training
+        model2.add(keras.layers.Dropout(droprate))
 
     ### flatten the network
     model2.add(keras.layers.Flatten())
@@ -139,7 +187,7 @@ if make_model:
     ### finish it off with a dense layer with the number of output we want for our luminosity function
     model2.add(keras.layers.Dense(lum_func_size, activation='linear'))
 
-    model2.compile(loss=keras.losses.logcosh,
+    model2.compile(loss=loss,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
 
@@ -168,9 +216,9 @@ history = LossHistory()
 
 callbacks_list = [checkpoint, history]
 
-###########################
-### Start Training the network
-###########################
+##########################
+## Start Training the network
+##########################
 subFields = lnn.loadBaseFNames(mapLoc)
 np.random.shuffle(subFields)
 
@@ -191,7 +239,7 @@ dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
-multi_gpu_model2.compile(loss=keras.losses.logcosh,
+multi_gpu_model2.compile(loss=loss,
                   optimizer=keras.optimizers.SGD(),
                   metrics=[keras.metrics.mse])
 # multi_gpu_model2.summary()
