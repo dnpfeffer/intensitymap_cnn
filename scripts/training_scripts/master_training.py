@@ -148,14 +148,9 @@ else:
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
 
-    try:
-        model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
-        make_model = False
-        fileName += '_{0}'.format(continue_count)
-    except:
-        print('Could not load model in {}.\nOpting to train a new model instead'.format(modelLoc + fileName))
-        fileName = fileName + '_new'
-
+    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
+    make_model = False
+    fileName += '_{0}'.format(continue_count)
 
 if make_model:
     model2 = keras.Sequential()
