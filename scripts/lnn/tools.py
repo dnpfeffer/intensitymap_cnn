@@ -42,7 +42,7 @@ def get_full_history(model_name, model_loc):
         return(base_history)
 
     ### combine histories if the model was trained multiple times
-    for i in range(2, train_count+1):
+    for i in range(1, train_count):
         new_history = load_history('{0}_{1}'.format(history_name, i))
         for key in base_history:
             base_history[key] = base_history[key] + new_history[key]
