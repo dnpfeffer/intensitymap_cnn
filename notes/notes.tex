@@ -268,10 +268,24 @@
 				\label{fig:full_lum_4_layer_model_history}
 			\end{figure}
 
-	\section{Training and Testing Regime} \label{sec:tat}
-		Once we determine what architectures we are using we must determine what we want to train and test our networks on.  As of right now we have 3 luminosity models with uncertainty on parameters.  We don't have any noise or uncertainty due to astrophysics, cosmology or the detector yet.  That will need to be put into the map making process.
+	\section{Finalizing the architectures} \label{sec:arch}
+		The architecture of the model needs to be finalized.  The last things to look at are really
+		\begin{enumerate}
+			\item log v.s. normal map input values
 
-		I think first we will decide what architectures to train with.  We can pick a few like log 4 layer 2D and log 4 layer (which is 3D) and full 5 layer as an example.  After we pick the architectures we need to determine what we are training on.  I believe we should train a network for each architecture on the following
+			\item \(\phi\) v.s. \(N\)
+
+			\item How many layers and filters can the gpu handle
+
+			\item Any changes to hyper parameters?
+		\end{enumerate}
+
+	\section{Training and Testing On Many Models} \label{sec:tat}
+		\dnp{This stuff should be a second topic after testing with just white noise and seeing how good it is}
+
+		Once we determine what architectures we are using we must determine what we want to train and test our networks on.  As of right now we have 3 luminosity models with uncertainty on parameters.  The only noise currently implemented is white noise.
+
+		We'll need to see what maps we want to train on.  Some possible things to train on are as follows.
 		\begin{enumerate}
 			\item All base luminosity models (Just a single model at a time)
 
@@ -308,7 +322,13 @@
 
 			\item \sout{Use validation data to see that the model is actually learning and not memorizing.}
 
-			\item Figure out what architecture we actually want to use and start the actual training and testing
+			\item \sout{Ability to train on log input data}
+
+			\item \sout{Ability to make noisy maps when producing the maps, or to add noise to maps after the fact}
+
+			\item See how many filters / layers the gpus can handle for 2D convolutions
+
+			\item Figure out what architecture we actually want to use and start the actual training and testing.  Log input or not, \(\phi\) v.s. \(N\), \# of layers, \# of filters.
 		\end{enumerate}
 
 

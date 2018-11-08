@@ -36,6 +36,12 @@ def Lco_to_map(halos,map, **kw):
     maps, edges = np.histogramdd( np.c_[halos.ra, halos.dec, halos.nu],
                                   bins    = bins3D,
                                   weights = halos.Tco )
+
+    ### add white noise if it is requested
+    if 'noise' in kw:
+        if kw['noise'] > 0:
+            maps = maps + np.absolute(np.random.normal(0, kw['noise'], maps.shape))
+
     # flip back frequency bins
     return maps[:,:,::-1]
 

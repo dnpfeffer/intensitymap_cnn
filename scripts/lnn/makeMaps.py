@@ -35,7 +35,7 @@ def makeLumFunc(halos):
     return([logLCent, lFunc, vals])
 
 ### function to make a map given a set of parameters
-def makeMapAndLumFunc(params, verbose=False):
+def makeMapAndLumFunc(params, verbose=False, noise=0):
     llm.debug.verbose = verbose
 
     if llm.debug.verbose:
@@ -55,7 +55,7 @@ def makeMapAndLumFunc(params, verbose=False):
     lumInfo = makeLumFunc(halos)
 
     ### Bin halo luminosities into map
-    mapinst.maps = llm.Lco_to_map(halos,mapinst, verbose=llm.debug.verbose)
+    mapinst.maps = llm.Lco_to_map(halos,mapinst, verbose=llm.debug.verbose, noise=noise)
 
     if llm.debug.verbose:
         llm.write_time('Finished Line Intensity Map Generation')
@@ -63,7 +63,7 @@ def makeMapAndLumFunc(params, verbose=False):
     return(mapinst, lumInfo)
 
 ### function to make and save a map given a set of parameters
-def makeAndSaveMapAndLumFunc(params, verbose=False):
+def makeAndSaveMapAndLumFunc(params, verbose=False, noise=0):
     llm.debug.verbose = verbose
 
     if llm.debug.verbose:
@@ -83,7 +83,7 @@ def makeAndSaveMapAndLumFunc(params, verbose=False):
     lumInfo = makeLumFunc(halos)
 
     ### Bin halo luminosities into map
-    mapinst.maps = llm.Lco_to_map(halos,mapinst, verbose=llm.debug.verbose)
+    mapinst.maps = llm.Lco_to_map(halos,mapinst, verbose=llm.debug.verbose, noise=noise)
 
     if llm.debug.verbose:
         llm.write_time('Finished Line Intensity Map Generation')
