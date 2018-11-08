@@ -24,16 +24,21 @@ def fileToLum(fName):
 def lumFuncByproduct(lumInfo, lumByproduct='basic'):
     lumResult = []
     for i in range(len(lumInfo['lumFunc'])):
-        l = lumInfo['lumFunc'][i]
         if lumByproduct == 'basic':
+            l = lumInfo['lumFunc'][i]
             lumResult.append(float(l))
         elif lumByproduct == 'log':
+            l = lumInfo['lumFunc'][i]
             if l == 0:
                 lumResult.append(0.0)
             else:
                 lumResult.append(np.log10(float(l)))
         elif lumByproduct == 'basicL':
+            l = lumInfo['lumFunc'][i]
             lumResult.append(float(l * lumInfo['logBinCent'][i]))
+        elif lumByproduct == 'numberCt':
+            n = lumInfo['numberCt'][i]
+            lumResult.append(float(n))
         else:
             pass
 
@@ -48,9 +53,16 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
     return(mapData, lumData)
 
 ### function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
-def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False):
+def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False, make_map_noisy=0):
     lumByproduct = lumByproduct.decode("utf-8")
     mapData, lumData = fileToMapAndLum(fName.decode('utf-8'), lumByproduct)
+
+    ### add gaussian noise, but make sure it is positive valued
+    if make_map_noisy > 0:
+        mapData = mapData + np.absolute(np.random.normal(0, 11, mapData.shape))
+
+    if log_input:
+        mapData = np.log10(mapData + 1e-6)
 
     if ThreeD:
         ### make sure to reshape the map data for the 3D convolutions

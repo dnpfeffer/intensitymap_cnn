@@ -71,6 +71,8 @@ base_filters = 16
 ### variables for what we are training on
 ThreeD = False
 luminosity_byproduct = 'log'
+log_input = False
+make_map_noisy = 0
 
 ### handle the argument parsing
 parser = argparse.ArgumentParser()
@@ -97,6 +99,8 @@ parser.add_argument('-l', '--numb_layers', type=int, default=numb_layers, help='
 parser.add_argument('-f', '--base_filters', type=int, default=base_filters, help='Number of filters to use in the first layer')
 parser.add_argument('-3d', '--threeD', type=lnn.str2bool, default=ThreeD, help='Use 3D convolutions or not')
 parser.add_argument('-lb', '--luminosity_byproduct', default=luminosity_byproduct, help='What luminosity function byproduct to train on')
+parser.add_argument('-li', '--log_input', type=lnn.str2bool, default=log_input, help='Take the log of the temperature map or not')
+parser.add_argument('-nm', '--make_map_noisy', type=float, default=make_map_noisy, help='Number of filters to use in the first layer')
 
 ### read in values for all of the argumnets
 args = parser.parse_args()
@@ -112,6 +116,8 @@ numb_layers = args.numb_layers
 base_filters = args.base_filters
 ThreeD = args.threeD
 luminosity_byproduct = args.luminosity_byproduct
+log_input = args.log_input
+make_map_noisy = args.make_map_noisy
 
 if fileName == '':
     fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
@@ -148,9 +154,14 @@ else:
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
 
-    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
-    make_model = False
-    fileName += '_{0}'.format(continue_count)
+    try:
+        model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
+        make_model = False
+        fileName += '_{0}'.format(continue_count)
+    except:
+        print('Could not load model in {}.\nOpting to train a new model instead'.format(modelLoc + fileName))
+        fileName = fileName + '_new'
+
 
 if make_model:
     model2 = keras.Sequential()
@@ -223,13 +234,13 @@ base_val = [mapLoc + s for s in subFields[valPoint:]]
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
 dataset_val = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base_val))
 dataset_val = dataset_val.shuffle(buffer_size=len(base_val))
-dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD], [tf.float64, tf.float64])))
+dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy], [tf.float64, tf.float64])))
 dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
