@@ -150,7 +150,9 @@ if continue_training:
 
     model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
     make_model = False
-    fileName += '_{0}'.format(continue_count)
+    continue_name = '_{0}'.format(continue_count)
+else:
+    continue_name = ''
 
 if make_model:
     model2 = keras.Sequential()
@@ -191,7 +193,7 @@ if make_model:
 ###########################
 ### Set up checkpoints to save the model
 ###########################
-filePath = modelLoc + fileName + '_temp.hdf5'
+filePath = modelLoc + fileName + '_temp' + continue_name  + '.hdf5'
 checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
 
 class LossHistory(keras.callbacks.Callback):
@@ -243,8 +245,8 @@ history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per
                         validation_data = dataset_val, validation_steps=3,
                         callbacks=callbacks_list, verbose=1)
 
-model2.save(modelLoc + fileName +  '.hdf5')
-model2.save_weights(modelLoc + fileName + '_weights.hdf5')
+model2.save(modelLoc + fileName + continue_name + '.hdf5')
+model2.save_weights(modelLoc + fileName + '_weights' + continue_name + '.hdf5')
 
-with open(modelLoc + fileName + '_history', 'wb') as file_pi:
+with open(modelLoc + fileName + '_history' + continue_name, 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
