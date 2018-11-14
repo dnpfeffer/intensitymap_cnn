@@ -41,7 +41,10 @@ def lumFuncByproduct(lumInfo, lumByproduct='basic'):
             lumResult.append(float(l * lumInfo['logBinCent'][i]))
         elif lumByproduct == 'numberCt':
             n = lumInfo['numberCt'][i]
-            lumResult.append(float(n))
+            if n == 0:
+                lumResult.append(0.0)
+            else:
+                lumResult.append(np.log10(float(n)))
         else:
             pass
 
