@@ -7,9 +7,12 @@ from .ioFuncs import *
 from limlam_mocker import limlam_mocker as llm
 
 ### function to convert a map file into a mapcube for the cnn
-def fileToMapData(fName):
+def fileToMapData(fName, log_input=False):
     mapData = loadData(fName)
     data = mapData['map_cube']
+
+    if log_input:
+        data = np.log10(data + 1e-6)
 
     return(data)
 

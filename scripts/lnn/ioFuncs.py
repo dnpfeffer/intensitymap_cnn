@@ -72,6 +72,14 @@ def loadSubFields(loc):
 
     return(subFieldNames)
 
+### function to remove duplicates from a list
+### the returned list will always be in the same order
+def remove_duplicates(list):
+    seen = set()
+    seen_add = seen.add
+    list = [x for x in list if not (x in seen or seen_add(x))]
+    return(list)
+
 ### function to get all the base file names in a directory
 def loadBaseFNames(loc):
     names = loadDirNpzs(loc)
@@ -79,7 +87,7 @@ def loadBaseFNames(loc):
     baseNames = [n[:-8] for n in names]
 
     ### remove duplicates
-    baseNames = list(set(baseNames))
+    baseNames = remove_duplicates(baseNames)
     return(baseNames)
 
 ### function to load all npz files in a direcotry
@@ -101,7 +109,7 @@ def loadDirNpzs(loc):
         names.append(p.name)
 
     ### remove duplicates
-    names = list(set(names))
+    names = remove_duplicates(names)
     return(names)
 
 ### function to get the names of files in the model folder that
