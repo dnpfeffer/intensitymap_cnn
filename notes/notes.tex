@@ -37,6 +37,23 @@
 		The idea of this project is to use machine learning on intensity maps to determine the luminosity function of the underlying halos.
 	\end{abstract}
 
+	\section{Jump to Section}
+		\begin{enumerate}
+			\item IM backgroundish \ref{sec:IMback}
+
+			\item ML background \ref{sec:MLback}
+
+			\item First CNN work \ref{sec:cnn}
+
+			\item Second batch of CNN work \ref{sec:cnn2}
+
+			\item Third wave of CNN work \ref{sec:arch}
+
+			\item Third wave with noise \ref{sec:noise}
+
+			\item To do list \ref{sec:todo}
+		\end{enumerate}	
+
 	\section{Intensity Maps Background} \label{sec:IMback}
 
 		Intensity mapping is done by looking at a given emission line.  Whatever is being traced should be emitting this line at any location where the tracer is located.  Having a higher density of the tracer would cause an increased intensity of whatever line is being looked at.  As the light travels to Earth it will get redshifted based on where it was originally emitted.  By looking at a range of frequencies one can get 3D spatial information (maps) about whatever tracer is being looked at.  
@@ -269,16 +286,116 @@
 			\end{figure}
 
 	\section{Finalizing the architectures} \label{sec:arch}
-		The architecture of the model needs to be finalized.  The last things to look at are really
-		\begin{enumerate}
-			\item log v.s. normal map input values
+		\subsection{No Noise} \label{sec:third_batch}
+			The architecture of the model needs to be finalized.  The last things to look at are really
+			\begin{enumerate}
+				\item log v.s. normal map input values
 
-			\item \(\phi\) v.s. \(N\)
+				\item \(\phi\) v.s. \(N\)
 
-			\item How many layers and filters can the gpu handle
+				\item How many layers and filters can the gpu handle
 
-			\item Any changes to hyper parameters?
-		\end{enumerate}
+				\item Any changes to hyper parameters?
+			\end{enumerate}
+
+			Note that I know realized that whenever I have been using \(\phi\) in the second batch of testing I have only been using \(dN\).  I've only been considering the differential amount of sources in a bin.  Because I am using log bins this should be the same as \(dN/d\log L\) up to a constant amplitude difference.
+
+			\cref{fig:arch_compare_n,fig:arch_compare_n_ratio,fig:arch_compare_dn,fig:arch_compare_dn_ratio} show the difference between models that vary, number of layers, number of base filters, log input v.s. normal inputs, dN v.s. N and kernel size for convolutions.  The base number of filters was 32 and was used by everything but the most\_filters model.  The most\_filters model used 128 filters, but ran out of memory when training for the second time so only trained half as long as the other models.  Because there is a convolution layer (that acts as a pooling layer) between normal convolution layers there is a max number of layers.  After 5 layers the remaining image is only 4x4 so convolutions using our original 5x5 filter just gets all information at once.  The way around this is to use a kernel size of 3x3 instead.  The 6 layer model uses 3x3 kernels.  There was also a test of a 5 layer model with a 3x3 kernel.
+
+			The output for the model trained on N gives weird results when displaying \(\log_{10} dN\) because it gets negative values that don't log well.  What we see in these figures is that more filters and more layers are better then less although they end up at pretty much the same accuracy.  We also see that the model trained on N is good at predicting N.  Models are generally better at predicting N and with less noise then dN.
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_n.pdf}
+				\caption{Output of different CNN architectures for N.}
+				\label{fig:arch_compare_n}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_n_ratio.pdf}
+				\caption{Same as \cref{fig:arch_compare_n}, but showing ratio of CNN output to underlying value instead of raw values.}
+				\label{fig:arch_compare_n_ratio}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_dn.pdf}
+				\caption{Output of different CNN architectures for dN.}
+				\label{fig:arch_compare_dn}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_dn_ratio.pdf}
+				\caption{Same as \cref{fig:arch_compare_dn}, but showing ratio of CNN output to underlying value instead of raw values.}
+				\label{fig:arch_compare_dn_ratio}
+			\end{figure}
+
+			The loss from training and validation from a few models are shown in \cref{fig:log_lum_full_in_5_layer_2D_history,fig:log_numberCt_full_in_5_layer_2D_history,fig:log_lum_full_in_5_layer_2D_most_filters_history,fig:log_lum_full_in_6_layer_kernel_3_2D_history}.  The validation loss being less than the training loss is interesting.  This could be due to dropout while training.  While training 20\% of the neurons don't fire as a way to help prevent over-fitting.  It also means that the CNN isn't at it's best while training.  Validation data is taken without dropout so it can be better.  The weird discontinuities at the 100th epoch are due to the model being trained again.  I only had enough time to train for 100 epochs before time out so I had to resume and in doing so it did something.  One should be careful about comparing the log luminosity models to the number count models because they are looking at different things so different values are to be expected.
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=0.8\textwidth]{log_lum_full_in_5_layer_2D_history.pdf}
+				\caption{Loss history of the training of the log\_lum\_full\_in\_5\_layer\_2D model.}
+				\label{fig:log_lum_full_in_5_layer_2D_history}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=0.8\textwidth]{log_numberCt_full_in_5_layer_2D_history.pdf}
+				\caption{Loss history of the training of the log\_numberCt\_full\_in\_5\_layer\_2D model.}
+				\label{fig:log_numberCt_full_in_5_layer_2D_history}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=0.8\textwidth]{log_lum_full_in_5_layer_2D_most_filters_history.pdf}
+				\caption{Loss history of the training of the log\_lum\_full\_in\_5\_layer\_2D\_most\_filters model.}
+				\label{fig:log_lum_full_in_5_layer_2D_most_filters_history}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=0.8\textwidth]{log_lum_full_in_6_layer_kernel_3_2D_history.pdf}
+				\caption{Loss history of the training of the log\_lum\_full\_in\_6\_layer\_kernel\_3\_2D model.}
+				\label{fig:log_lum_full_in_6_layer_kernel_3_2D_history}
+			\end{figure}
+
+		\subsection{Adding Noise} \label{sec:noise}
+
+			Testing models on perfect information is all good and dandy, but we want to test our models against more realistic scenarios.  In https://arxiv.org/abs/1808.07487 they try to get the luminosity function (\(\phi L\)) from intensity maps using an MCMC and power spectra.  They also include an 11 \(\mu K\) white noise to their maps so it would be good to compare to their work.  \cref{fig:arch_compare_noise_n,fig:arch_compare_noise_n_ratio,fig:arch_compare_noise_dn,fig:arch_compare_noise_dn_ratio} are similar to \cref{fig:arch_compare_n,fig:arch_compare_n_ratio,fig:arch_compare_dn,fig:arch_compare_dn_ratio} except the map (it is the same exact map) was loaded with 11 \(\mu K\) of white noise.
+
+			What we see is that most models get worse as in they predict less N or dN for all luminosities, but the 6 layer one gets much better because it originally over predicted values.  Increasing the noise by a factor of 10 to 100 \(\mu K\) does not change model predictions that much.  There is some variation because the noise varies whenever the map is loaded, but adding noise makes the 6 layer model better.  All of the other models bunch together.  This was not training on noise or anything, this is just taking the models we trained on perfect data and just putting noise into the maps when we want a prediction.  
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_noise_n.pdf}
+				\caption{Output of different CNN architectures for N with 10 \(\mu K\) white noise.}
+				\label{fig:arch_compare_noise_n}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_noise_n_ratio.pdf}
+				\caption{Same as \cref{fig:arch_compare_noise_n}, but showing ratio of CNN output to underlying value instead of raw values.}
+				\label{fig:arch_compare_noise_n_ratio}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_noise_dn.pdf}
+				\caption{Output of different CNN architectures for dN with 10 \(\mu K\) white noise.}
+				\label{fig:arch_compare_noise_dn}
+			\end{figure}
+
+			\begin{figure}[H]
+				\centering
+				\includegraphics[width=1.0\textwidth]{arch_compare_noise_dn_ratio.pdf}
+				\caption{Same as \cref{fig:arch_compare_noise_dn}, but showing ratio of CNN output to underlying value instead of raw values.}
+				\label{fig:arch_compare_noise_dn_ratio}
+			\end{figure}
+
 
 	\section{Training and Testing On Many Models} \label{sec:tat}
 		\dnp{This stuff should be a second topic after testing with just white noise and seeing how good it is}
@@ -300,7 +417,7 @@
 		From this we need to determine which model works best in each scenario that matters.  My naive guess would be models trained on noise will be better with noise and models without noise would be better for future experiments with less noise.
 
 
-	\section{Things to do for Dan in no particular order}
+	\section{Things to do for Dan in no particular order} \label{sec:todo}
 		\begin{enumerate}
 			\item Figure out what a good frequency bin size is
 
@@ -326,9 +443,11 @@
 
 			\item \sout{Ability to make noisy maps when producing the maps, or to add noise to maps after the fact}
 
-			\item See how many filters / layers the gpus can handle for 2D convolutions
+			\item \sout{See how many filters / layers the gpus can handle for 2D convolutions}
 
 			\item Figure out what architecture we actually want to use and start the actual training and testing.  Log input or not, \(\phi\) v.s. \(N\), \# of layers, \# of filters.
+
+			\item Put info in about visualizing layers
 		\end{enumerate}
 
 
