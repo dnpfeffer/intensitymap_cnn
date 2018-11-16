@@ -7,6 +7,9 @@ import lnn as lnn
 haloLoc = '../catalogues2/'
 mapLoc = '../maps2/random_maps1/'
 
+### what noise level to use
+noise = 0
+
 ### make sure the map directory exists
 lnn.checkDirectoryPath(mapLoc)
 
@@ -18,7 +21,7 @@ numb_maps = 5796
 
 ### start making random maps
 for i in range(numb_maps):
-    lnn.make_random_map(subFields, haloLoc, mapLoc)
+    lnn.make_random_map(subFields, haloLoc, mapLoc, noise=noise)
 
     ### print every 100 maps where we are in the process
     if i%100 == 0:

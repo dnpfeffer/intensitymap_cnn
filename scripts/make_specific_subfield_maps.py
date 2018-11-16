@@ -5,11 +5,14 @@ import lnn as lnn
 
 ### set the location of the halo catalogs and maps
 haloLoc = '../catalogues2/'
-mapLoc = '../maps2/basic_Padmanabhan/'
+mapLoc = '../maps2/random_Li/'
 
 ### what model to use and if the maps should use random values or not
-model = 'Padmanabhan'
+model = 'Li'
 default = True
+
+### what level of noise to use
+noise = 11
 
 ### make sure the map directory exists
 lnn.checkDirectoryPath(mapLoc)
@@ -22,7 +25,7 @@ numb_maps = len(subFields)
 
 ### start making random maps
 for i in range(numb_maps):
-    lnn.make_random_map_from_cat(subFields[i], haloLoc, mapLoc, model, default)
+    lnn.make_random_map_from_cat(subFields[i], haloLoc, mapLoc, model, default, noise=noise)
 
     ### print every 100 maps where we are in the process
     if i%100 == 0:

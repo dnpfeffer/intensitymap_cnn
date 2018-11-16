@@ -294,6 +294,8 @@ end_cut_off=1, evaluate=False, display='log', make_map_noisy=0):
 
 ### plot multiple models together to compare them
 def plot_multiple_models(compare_lum, cnn_lums, model_keys, lumLogBinCents, display='log'):
+    plt.figure(figsize=(12, 6))
+
     ### plot the underlying distribution
     plt.semilogx(lumLogBinCents, compare_lum, label='Simulated')
 
@@ -321,6 +323,8 @@ def plot_multiple_models(compare_lum, cnn_lums, model_keys, lumLogBinCents, disp
 
 ### plot mutliple model ratios together for comparisons
 def plot_multiple_models_ratios(compare_lum, cnn_lums, model_keys, lumLogBinCents, end_cut_off=1):
+    plt.figure(figsize=(12, 6))
+
     ### plot the ratio of 1
     ratio = compare_lum/compare_lum
     plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label='100%')

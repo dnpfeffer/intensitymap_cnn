@@ -12,6 +12,9 @@ model = 'Li'
 coeffs = None
 #min_mass = 2.5e10
 
+### set noise
+noise = 0
+
 ### get the subfield names
 subFields = lnn.loadSubFields(haloLoc)
 
@@ -26,6 +29,6 @@ lnn.checkDirectoryPath(mapLoc)
 for sub in subFields:
     #if 'COMAP_z2.39-3.44_1140Mpc_seed_13649_rotate_0_subfield_0.npz' in sub:
     param = lnn.getParams(haloLoc + sub, mapLoc + sub, **paramDict)
-    lnn.makeAndSaveMapAndLumFunc(param, verbose=False)
+    lnn.makeAndSaveMapAndLumFunc(param, verbose=False, noise=noise)
 
 

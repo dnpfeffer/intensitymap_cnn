@@ -175,16 +175,16 @@ def getParams(haloCat, mapFile, model='Li', coeffs=None, **kwargs):
     return(params)
 
 ### function to make a random map given a selection of catalogs, the catalog location and the location to store the map
-def make_random_map(catalogs, haloLoc, mapLoc):
+def make_random_map(catalogs, haloLoc, mapLoc, noise=0):
     ### choose a random catalog
     catalog = random.choice(catalogs)
     ### make the random map
-    make_random_map_from_cat(catalog, haloLoc, mapLoc)
+    make_random_map_from_cat(catalog, haloLoc, mapLoc, noise=noise)
 
     return()
 
 ### function to make a random map given a specific catalog, catalog location and location to store the map
-def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False):
+def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False, noise=0):
     ### make a random paramDict
     paramDict = {}
     paramDict = make_paramDict(paramDict=paramDict, model=model, default=default)
@@ -199,7 +199,7 @@ def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False
     file_name = coeffs_to_file_name(param.model, param.coeffs, mapLoc, catalog)
     param.map_output_file = file_name
     # print(param.halo_catalogue_file, '\n', param.map_output_file, '\n', param.model, '\n', param.coeffs)
-    makeAndSaveMapAndLumFunc(param, verbose=False)
+    makeAndSaveMapAndLumFunc(param, verbose=False, noise=noise)
 
 ### function to make a random paramDict for a limlam_mocker run
 ### randomizes the model and the values of the coefficients in the model if requested
