@@ -31,7 +31,7 @@ continue_training = False
 ### locations
 mapLoc = '../../maps2/basic_Li/'
 catLoc = '../../catalogues/'
-modelLoc = '../../models3/'
+modelLoc = '../../models2/'
 
 ### map info
 numb_maps = 100
@@ -68,11 +68,6 @@ numb_layers = 4
 ### base number of filters
 base_filters = 16
 
-### kernel sizes
-kernel_size = 5
-pool_size = 2
-
-
 ### variables for what we are training on
 ThreeD = False
 luminosity_byproduct = 'log'
@@ -106,7 +101,6 @@ parser.add_argument('-3d', '--threeD', type=lnn.str2bool, default=ThreeD, help='
 parser.add_argument('-lb', '--luminosity_byproduct', default=luminosity_byproduct, help='What luminosity function byproduct to train on')
 parser.add_argument('-li', '--log_input', type=lnn.str2bool, default=log_input, help='Take the log of the temperature map or not')
 parser.add_argument('-nm', '--make_map_noisy', type=float, default=make_map_noisy, help='Number of filters to use in the first layer')
-parser.add_argument('-ks', '--kernel_size', type=int, default=kernel_size, help='Kernel size of convolution')
 
 ### read in values for all of the argumnets
 args = parser.parse_args()
@@ -124,7 +118,6 @@ ThreeD = args.threeD
 luminosity_byproduct = args.luminosity_byproduct
 log_input = args.log_input
 make_map_noisy = args.make_map_noisy
-kernel_size = args.kernel_size
 
 if fileName == '':
     fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
@@ -142,15 +135,11 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 #########################
 make_model = True
 
-### set which convolution to use depending on if it is 3D or not and kernel sizes
+### set which convolution to use depending on if it is 3D or not
 if ThreeD:
     conv = keras.layers.Conv3D
-    kernel = [kernel_size for i in range(3)]
-    pool = [pool_size for i in range(3)]
 else:
     conv = keras.layers.Conv2D
-    kernel = [kernel_size for i in range(2)]
-    pool = [pool_size for i in range(2)]
 
 ### choose which loss to use
 if luminosity_byproduct == 'log':
@@ -159,40 +148,41 @@ elif luminosity_byproduct == 'basic':
     loss = keras.losses.msle
 elif luminosity_byproduct == 'basicL':
     loss = keras.losses.msle
-elif luminosity_byproduct == 'numberCt':
-    loss = keras.losses.logcosh
 else:
     loss = keras.losses.mse
 
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
 
-    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
-    make_model = False
-    continue_name = '_{0}'.format(continue_count)
-else:
-    continue_name = ''
+    try:
+        model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
+        make_model = False
+        fileName += '_{0}'.format(continue_count)
+    except:
+        print('Could not load model in {}.\nOpting to train a new model instead'.format(modelLoc + fileName))
+        fileName = fileName + '_new'
+
 
 if make_model:
     model2 = keras.Sequential()
 
     ### convolutional layer
-    model2.add(conv(base_filters, kernel_size=kernel, strides=(1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps)))
+    model2.add(conv(base_filters, kernel_size=(5,5), strides=(1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps)))
     ### batch normalization
     model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
-    model2.add(conv(base_filters, kernel_size=pool, strides=(2,2), activation='relu'))
+    model2.add(conv(base_filters, kernel_size=(2,2), strides=(2,2), activation='relu'))
     ### dropout for training
     model2.add(keras.layers.Dropout(droprate))
 
     ### loop through and add layers
     for i in range(2, numb_layers+1):
         ### convolutional layer
-        model2.add(conv(base_filters*(2**(i-1)), kernel, activation='relu'))
+        model2.add(conv(base_filters*(2**(i-1)), (5,5), activation='relu'))
         ### batch normalization
         model2.add(keras.layers.BatchNormalization())
         ### use a convolution instead of a pool that acts like a pool
-        model2.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=(2,2), activation='relu'))
+        model2.add(conv(base_filters*(2**(i-1)), kernel_size=(2,2), strides=(2,2), activation='relu'))
         ### dropout for training
         model2.add(keras.layers.Dropout(droprate))
 
@@ -212,7 +202,7 @@ if make_model:
 ###########################
 ### Set up checkpoints to save the model
 ###########################
-filePath = modelLoc + fileName + '_temp' + continue_name  + '.hdf5'
+filePath = modelLoc + fileName + '_temp.hdf5'
 checkpoint = keras.callbacks.ModelCheckpoint(filePath, monitor='loss', verbose=1, save_best_only=False, mode='auto', period=callBackPeriod)
 
 class LossHistory(keras.callbacks.Callback):
@@ -264,8 +254,8 @@ history = multi_gpu_model2.fit(dataset, epochs=epochs, steps_per_epoch=steps_per
                         validation_data = dataset_val, validation_steps=3,
                         callbacks=callbacks_list, verbose=1)
 
-model2.save(modelLoc + fileName + continue_name + '.hdf5')
-model2.save_weights(modelLoc + fileName + '_weights' + continue_name + '.hdf5')
+model2.save(modelLoc + fileName +  '.hdf5')
+model2.save_weights(modelLoc + fileName + '_weights.hdf5')
 
-with open(modelLoc + fileName + '_history' + continue_name, 'wb') as file_pi:
+with open(modelLoc + fileName + '_history', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
