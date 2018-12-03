@@ -29,9 +29,9 @@ from keras.backend.tensorflow_backend import set_session
 continue_training = False
 
 ### locations
-mapLoc = '../../maps2/basic_Li/'
-catLoc = '../../catalogues/'
-modelLoc = '../../models3/'
+mapLoc = 'basic_Li'
+catLoc = 'catalogues'
+modelLoc = 'models3'
 
 ### map info
 numb_maps = 100
@@ -107,6 +107,10 @@ parser.add_argument('-lb', '--luminosity_byproduct', default=luminosity_byproduc
 parser.add_argument('-li', '--log_input', type=lnn.str2bool, default=log_input, help='Take the log of the temperature map or not')
 parser.add_argument('-nm', '--make_map_noisy', type=float, default=make_map_noisy, help='Number of filters to use in the first layer')
 parser.add_argument('-ks', '--kernel_size', type=int, default=kernel_size, help='Kernel size of convolution')
+parser.add_argument('-mal', '--map_loc', default=mapLoc, help='Location of maps')
+parser.add_argument('-cl', '--cat_loc', default=catLoc, help='Location of catalogs')
+parser.add_argument('-mol', '--model_loc', default=modelLoc, help='Location of models')
+
 
 ### read in values for all of the argumnets
 args = parser.parse_args()
@@ -128,6 +132,10 @@ kernel_size = args.kernel_size
 
 if fileName == '':
     fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
+
+mapLoc = '../../maps2/{0}/'.format(args.map_loc)
+catLoc = '../../{0}/'.format(args.cat_loc)
+modelLoc = '../../{0}/'.format(args.model_loc)
 
 ### set up how much memory the gpus use
 config = tf.ConfigProto()
@@ -236,11 +244,19 @@ callbacks_list = [checkpoint, history]
 ## Start Training the network
 ##########################
 subFields = lnn.loadBaseFNames(mapLoc)
-np.random.shuffle(subFields)
 
+### set random seed so data is shuffeled the same way every time and then make the seed random
+np.random.seed(1234)
+np.random.shuffle(subFields)
+np.random.seed()
+
+### shuffle  test and validation data
 valPoint = int(len(subFields)*valPer)
 base = [mapLoc + s for s in subFields[:valPoint]]
 base_val = [mapLoc + s for s in subFields[valPoint:]]
+np.random.shuffle(base)
+np.random.shuffle(base_val)
+
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
