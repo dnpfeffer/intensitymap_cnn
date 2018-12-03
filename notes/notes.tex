@@ -51,6 +51,8 @@
 
 			\item Third wave with noise \ref{sec:noise}
 
+			\item Compare to Power Spectrum Method \ref{sec:power_compare}
+
 			\item To do list \ref{sec:todo}
 		\end{enumerate}	
 
@@ -385,7 +387,7 @@
 			\begin{figure}[H]
 				\centering
 				\includegraphics[width=1.0\textwidth]{arch_compare_noise_dn.pdf}
-				\caption{Output of different CNN architectures for dN with 10 \(\mu K\) white noise.}
+				\caption{Output of different CNN architectures for dN with 11 \(\mu K\) white noise.}
 				\label{fig:arch_compare_noise_dn}
 			\end{figure}
 
@@ -395,6 +397,112 @@
 				\caption{Same as \cref{fig:arch_compare_noise_dn}, but showing ratio of CNN output to underlying value instead of raw values.}
 				\label{fig:arch_compare_noise_dn_ratio}
 			\end{figure}
+
+	\section{Compare to \href{https://arxiv.org/pdf/1808.07487.pdf}{COMAP power spectrum luminosity method} work} \label{sec:power_compare}
+		The work in \cref{sec:arch} points to wanting to have more layers and more filters.  There was no reason to go beyond 6 layers because of the fact that we would not be able to convolve anything in the 7th layer.  More than 64 starting filters would lead to memory issues so we decided to only test 32 and 64 initial filters.  Hyperparameters were still not messed with.  \cref{fig:power_compare_dn,fig:power_compare_dn_ratio,fig:power_compare_noise_dn,fig:power_compare_noise_dn_ratio} show the results of 200 epochs of training 6 layer models with a kernel size of 3 with starting size of 32 or 64 filters as well as training with noise or not.  The plots show the usual things of comparing the output for N and dN v.s. the underlying values and then looking at the ratio of predicted to underlying.  What we see is that the 64 filters doesn't do the best.  Noise actually improves the 32 filter model, but doesn't do much for the 64 filter models.  It seems like 32 filters is a good amount to have.
+
+		\begin{figure}[H]
+				\centering
+			\includegraphics[width=1.0\textwidth]{power_compare_dn.pdf}
+			\caption{Output of different CNN architectures for dN.}
+			\label{fig:power_compare_dn}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.0\textwidth]{power_compare_dn_ratio.pdf}
+			\caption{Same as \cref{fig:power_compare_dn}, but showing ratio of CNN output to underlying value instead of raw values.}
+			\label{fig:power_compare_dn_ratio}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.0\textwidth]{power_compare_noise_dn.pdf}
+			\caption{Output of different CNN architectures for dN with 11 \(\mu K\) white noise.}
+			\label{fig:power_compare_noise_dn}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.0\textwidth]{power_compare_noise_dn_ratio.pdf}
+			\caption{Same as \cref{fig:power_compare_noise_dn}, but showing ratio of CNN output to underlying value instead of raw values.}
+			\label{fig:power_compare_noise_dn_ratio}
+		\end{figure}
+
+		In \cref{fig:log_lum_full_in_6_layer_kernel_3_2D_history_2,fig:log_lum_full_in_6_layer_kernel_3_2D_64_filters_history_2,fig:log_lum_full_in_6_layer_kernel_3_2D_random_Li_history,fig:log_lum_full_in_6_layer_kernel_3_2D_64_filters_random_Li_history} we see the training history for the models being looked at in this section.  For the non-noisy models the plot is messed up.  Epochs 100-175 for them are from a different run.  Do to how I programmed things and the fact that I used the same names it did something stupid.  Those epochs are an artifact and did not affect how the models trained this time.  It only had 200 epochs of training and I didn't feel like trying to fix the plots and make them better.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.8\textwidth]{log_lum_full_in_6_layer_kernel_3_2D_history_2.pdf}
+			\caption{Loss history of the training of the log\_lum\_full\_in\_6\_layer\_kernel\_3\_2D model.  See the above paragraph about epochs 100-175.}
+			\label{fig:log_lum_full_in_6_layer_kernel_3_2D_history_2}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.8\textwidth]{log_lum_full_in_6_layer_kernel_3_2D_64_filters_history_2.pdf}
+			\caption{Loss history of the training of the log\_lum\_full\_in\_6\_layer\_kernel\_3\_2D\_64\_filters model.  See the above paragraph about epochs 100-175.}
+			\label{fig:log_lum_full_in_6_layer_kernel_3_2D_64_filters_history_2}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.8\textwidth]{log_lum_full_in_6_layer_kernel_3_2D_random_Li_history.pdf}
+			\caption{Loss history of the training of the log\_lum\_full\_in\_6\_layer\_kernel\_3\_2D\_random\_Li model.}
+			\label{fig:log_lum_full_in_6_layer_kernel_3_2D_random_Li_history}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.8\textwidth]{log_lum_full_in_6_layer_kernel_3_2D_64_filters_random_Li_history.pdf}
+			\caption{Loss history of the training of the log\_lum\_full\_in\_6\_layer\_kernel\_3\_2D\_64\_filters\_random\_Li model.}
+			\label{fig:log_lum_full_in_6_layer_kernel_3_2D_64_filters_random_Li_history}
+		\end{figure}
+
+		Looking at this it seems like 11 \(\mu K\) of noise doesn't do much to these models, but training on it does help a bit.  Increasing the amount of noise by a factor of 3 does impact things though.  \dnp{I should remember to put in a figure for this}.
+
+		At some point we should actually compare to the power spectrum and and temperature bin method of determining the underlying luminosity function.  Figure \ref{fig:comap_power_spectrum} is the money plot from arxiv:1808.07487 which shows how accurate the power spectrum method is.  One of the issues with this is that the luminosity function being used in the power spectrum paper is a density rather then the raw number count being used in this work so far.  If we were working with real valued data instead of log data this wouldn't be an issue because a ratio gets rid of scaling, but that is not true in log space.
+
+		\begin{equation}
+			\frac{x \times a}{y \times a} = \frac{x}{y}
+		\end{equation}
+		\begin{equation} \label{eq:logs}
+			\frac{\log (x \times a)}{\log (y \times a)} = \frac{\log x + \log a}{\log y + \log a} \neq \frac{\log x}{\log y}
+		\end{equation}
+
+		This means that converting from a density to number counts or vice versa will change the expected accuracy of the technique.  Figure \ref{fig:lum_func_size} shows the magnitude of a random map from the CNN training.  It has values that are more then 6 orders of magnitude greater then the ones used in the power spectrum method.  In Eq. \eqref{eq:logs} this would equate to having \(a = 10^6\).  The \(\log a\) terms will dominate in some regions of the ratio compared to the \(\log x\) and \(\log y\) terms.  The \(\log x\) and \(\log y\) terms represent the CNN prediction for the luminosity function and the underlying value and in density space will have values between -1 and -6.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{comap_power_spectrum.pdf}
+			\caption{Figure from arxiv:1808.07487 showing the accuracy of the power spectrum luminosity function prediction technique.  The y-axis is a luminosity function density instead of raw number count and the x-axis is just luminosity with the first major tick being \(10^4 L_{sun}\).  The grey shaded region is the 95\% credibility interval of the power spectrum method while the purple line is the underlying luminosity function.}
+			\label{fig:comap_power_spectrum}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{lum_func_size.pdf}
+			\caption{Figure showing the magnitude of luminosity functions used while training the CNNs.  Notice that the y-axis if \cref{fig:comap_power_spectrum} is about 6 orders of magnitude smaller.}
+			\label{fig:lum_func_size}
+		\end{figure}
+
+		We must also figure out how to display our results in a statistical manor like that of the ones shown in \cref{fig:comap_power_spectrum}.  To do this we need the variance (with respect to the underlying luminosity function) of our CNN models.  To calculate this I run a model on 40 different maps.  For each luminosity I calculate the variance of the CNN luminosity functions with respect to the underlying function.  From this I then calculate the standard deviation (std) and can get the 95\% confidence interval using twice the std.  When comparing the accuracy of the CNN by eye before I never thought about the 95\% confidence interval used in the power spectrum paper so it really doubles the inaccuracy I was observing.  \cref{fig:no_noise_compare,fig:noise_compare} show the results for this with and without noise as well as the confidence interval for the power spectrum method.  We can see that the CNN method is not as good as we believed.  When comparing the correct things the CNN method is not the clear better choice.  It is better at lower luminosities up until around \(few \times 10^5\) and stays worse until around \(10^6\) where the two methods are roughly comparable again.
+
+		At a glance both methods seem comparable.  Further in there are some differences.  The CNN method is slow to train, but fast to get a luminosity function from a given map after training.  I'm not sure about the speed of the power spectrum method.  Running an MCMC is not usually the fastest thing around.  The power spectrum method also takes into account a prediction of the underlying luminosity function.  A different underlying function then the predicted one would probably cause issues.  The CNN needs to train on simulated maps, so using maps made from multiple models will reduce accuracy, but I believe it shouldn't be as bad as with the power spectrum.  \dnp{This should be tested later.}  \dnp{It hasn't been better, but the CNN might be better with foregrounds.  This really needs to be tested.}  
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.2\textwidth]{no_noise_compare.pdf}
+			\caption{Comparison of different methods to determine the underlying luminosity function of an intensity map.  The shaded regions are the 95\% credibility interval or the 2 \(\sigma\) error bounds.}
+			\label{fig:no_noise_compare}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.2\textwidth]{noise_compare.pdf}
+			\caption{Same as \cref{fig:no_noise_compare}, but with 11 \(\mu K\) white noise.}
+			\label{fig:noise_compare}
+		\end{figure}
 
 
 	\section{Training and Testing On Many Models} \label{sec:tat}
@@ -419,7 +527,7 @@
 
 	\section{Things to do for Dan in no particular order} \label{sec:todo}
 		\begin{enumerate}
-			\item Figure out what a good frequency bin size is
+			\item \sout{Figure out what a good frequency bin size is}  COMAP can handle around 500 different frequency bins so using 100 is a lower limit.
 
 			\item \sout{Make maps and luminosity functions. Have done this for some maps and have the ability to do this for more.}
 
@@ -445,9 +553,11 @@
 
 			\item \sout{See how many filters / layers the gpus can handle for 2D convolutions}
 
-			\item Figure out what architecture we actually want to use and start the actual training and testing.  Log input or not, \(\phi\) v.s. \(N\), \# of layers, \# of filters.
+			\item \sout{Figure out what architecture we actually want to use and start the actual training and testing.  Log input or not, \(\phi\) v.s. \(N\), \# of layers, \# of filters.}  6 layers, 32 initial filters, full input, log output, \(dN/dL\) with log spacing of L.
 
-			\item Put info in about visualizing layers
+			\item Put info in about visualizing layers?  Can do this, but do we care right now?
+
+			\item Foregrounds?
 		\end{enumerate}
 
 
