@@ -163,6 +163,9 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
     ### make a prediction for the luminoisty byproduct for the given map
     cnn_lum = model.predict(tf.convert_to_tensor(base_map), steps=1)
 
+    # print(cnn_lum)
+    # print('testing')
+
     ### return loss and other metric data about the CNN's output
     if evaluate:
         print('Error and MSE for the given base_number:')

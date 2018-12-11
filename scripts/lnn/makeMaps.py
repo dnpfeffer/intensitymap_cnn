@@ -175,11 +175,11 @@ def getParams(haloCat, mapFile, model='Li', coeffs=None, **kwargs):
     return(params)
 
 ### function to make a random map given a selection of catalogs, the catalog location and the location to store the map
-def make_random_map(catalogs, haloLoc, mapLoc, noise=0):
+def make_random_map(catalogs, haloLoc, mapLoc, default=False, noise=0):
     ### choose a random catalog
     catalog = random.choice(catalogs)
     ### make the random map
-    make_random_map_from_cat(catalog, haloLoc, mapLoc, noise=noise)
+    make_random_map_from_cat(catalog, haloLoc, mapLoc, default=default, noise=noise)
 
     return()
 
