@@ -12,7 +12,7 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 train_number=0,
                 droprate=0.3, numb_layers=6, base_filters=128, threeD=True,
                 luminosity_byproduct='log', kernel_size=3, cardinality=1,
-                give_weights=False):
+                give_weights=False, loss=keras.losses.logcosh):
 
     def residual_network(x):
         def add_common_layers(y):
@@ -124,18 +124,6 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
     #     conv = keras.layers.Conv2D
     #     kernel = [kernel_size for i in range(2)]
     #     pool = [pool_size for i in range(2)]
-
-    ### choose which loss to use
-    if luminosity_byproduct == 'log':
-        loss = keras.losses.logcosh
-    elif luminosity_byproduct == 'basic':
-        loss = keras.losses.msle
-    elif luminosity_byproduct == 'basicL':
-        loss = keras.losses.msle
-    elif luminosity_byproduct == 'numberCt':
-        loss = keras.losses.logcosh
-    else:
-        loss = keras.losses.mse
 
     image_tensor = layers.Input(shape=(pix_x, pix_y, numb_maps, 1))
     network_output = residual_network(image_tensor)

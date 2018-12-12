@@ -162,9 +162,21 @@ if continue_training:
 else:
     continue_name = ''
 
+### choose which loss to use
+if luminosity_byproduct == 'log':
+    loss = keras.losses.logcosh
+elif luminosity_byproduct == 'basic':
+    loss = keras.losses.msle
+elif luminosity_byproduct == 'basicL':
+    loss = keras.losses.msle
+elif luminosity_byproduct == 'numberCt':
+    loss = keras.losses.logcosh
+else:
+    loss = keras.losses.mse
+
 model2 = get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 luminosity_byproduct=luminosity_byproduct, cardinality=cardinality, base_filters=base_filters,
-                give_weights=False)
+                give_weights=False, loss=loss)
 
 ###########################
 ### Set up checkpoints to save the model
