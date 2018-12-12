@@ -250,8 +250,8 @@ def make_paramDict(paramDict, model=None, default=False):
         ### make sure last two parameters in the Li model are non-negative
         if model == 'Li':
             for i in [-1,-2]:
-                if coeffs[i] < 0:
-                    coeffs[i] = 0
+                if coeffs[i] <= 0:
+                    coeffs[i] = 1e-20
         if model == 'Padmanabhan':
             for i in [0]:
                 if coeffs[i] <= 0:

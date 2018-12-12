@@ -22,6 +22,7 @@ import tensorflow as tf
 from tensorflow import keras
 from keras.backend.tensorflow_backend import set_session
 
+
 ########################
 ### Setup Learning Environment and set variables that one would want to change between runs
 ########################
@@ -42,8 +43,7 @@ pix_y = 256
 lum_func_size = 49
 
 ### file name for output
-fileName = 'log_lum_5_layer_2D_model_long'
-continue_training_model_loc = fileName + '_temp.hdf5'
+fileName = 'log_lum_6_layer_23_model'
 
 ### callBackPeriod for checkpoints and saving things midway through
 callBackPeriod = 10
@@ -57,24 +57,26 @@ epochs = 150
 numb_gpu = 4
 
 ### dropout rate for training
-droprate = 0.2
+droprate = 0.3
 
 ### validation percent of data
 valPer = 0.2
 
 ### number of layers
-numb_layers = 4
+numb_layers = 6
 
 ### base number of filters
-base_filters = 16
+base_filters = 32
 
 ### kernel sizes
-kernel_size = 5
+kernel_size = 3
 pool_size = 2
 
+### cardinality
+cardinality = 1 #32
 
 ### variables for what we are training on
-ThreeD = False
+ThreeD = True
 luminosity_byproduct = 'log'
 log_input = False
 make_map_noisy = 0
@@ -110,6 +112,7 @@ parser.add_argument('-ks', '--kernel_size', type=int, default=kernel_size, help=
 parser.add_argument('-mal', '--map_loc', default=mapLoc, help='Location of maps')
 parser.add_argument('-cl', '--cat_loc', default=catLoc, help='Location of catalogs')
 parser.add_argument('-mol', '--model_loc', default=modelLoc, help='Location of models')
+parser.add_argument('-ca', '--cardinality', type=int, default=cardinality, help='Cardinality of ResNeXt')
 
 
 ### read in values for all of the argumnets
@@ -129,7 +132,12 @@ luminosity_byproduct = args.luminosity_byproduct
 log_input = args.log_input
 make_map_noisy = args.make_map_noisy
 kernel_size = args.kernel_size
+cardinality = args.cardinality
 
+### set the continue training name
+continue_training_model_loc = fileName + '_temp.hdf5'
+
+### how to handle no name given
 if fileName == '':
     fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
 
@@ -142,36 +150,9 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction = 1.0
 
-#sess = tf.Session(config=config)
-#set_session(sess)
-
 #########################
 ### Set Up the Model
 #########################
-make_model = True
-
-### set which convolution to use depending on if it is 3D or not and kernel sizes
-if ThreeD:
-    conv = keras.layers.Conv3D
-    kernel = [kernel_size for i in range(3)]
-    pool = [pool_size for i in range(3)]
-else:
-    conv = keras.layers.Conv2D
-    kernel = [kernel_size for i in range(2)]
-    pool = [pool_size for i in range(2)]
-
-### choose which loss to use
-if luminosity_byproduct == 'log':
-    loss = keras.losses.logcosh
-elif luminosity_byproduct == 'basic':
-    loss = keras.losses.msle
-elif luminosity_byproduct == 'basicL':
-    loss = keras.losses.msle
-elif luminosity_byproduct == 'numberCt':
-    loss = keras.losses.logcosh
-else:
-    loss = keras.losses.mse
-
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
 
@@ -181,41 +162,9 @@ if continue_training:
 else:
     continue_name = ''
 
-if make_model:
-    model2 = keras.Sequential()
-
-    ### convolutional layer
-    model2.add(conv(base_filters, kernel_size=kernel, strides=(1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps)))
-    ### batch normalization
-    model2.add(keras.layers.BatchNormalization())
-    ### use a convolution instead of a pool that acts like a pool
-    model2.add(conv(base_filters, kernel_size=pool, strides=(2,2), activation='relu'))
-    ### dropout for training
-    model2.add(keras.layers.Dropout(droprate))
-
-    ### loop through and add layers
-    for i in range(2, numb_layers+1):
-        ### convolutional layer
-        model2.add(conv(base_filters*(2**(i-1)), kernel, activation='relu'))
-        ### batch normalization
-        model2.add(keras.layers.BatchNormalization())
-        ### use a convolution instead of a pool that acts like a pool
-        model2.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=(2,2), activation='relu'))
-        ### dropout for training
-        model2.add(keras.layers.Dropout(droprate))
-
-    ### flatten the network
-    model2.add(keras.layers.Flatten())
-    ### make a dense layer for the second to last step
-    model2.add(keras.layers.Dense(1000, activation='relu'))
-    ### finish it off with a dense layer with the number of output we want for our luminosity function
-    model2.add(keras.layers.Dense(lum_func_size, activation='linear'))
-
-    model2.compile(loss=loss,
-                  optimizer=keras.optimizers.SGD(),
-                  metrics=[keras.metrics.mse])
-
-# model2.summary()
+model2 = get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
+                luminosity_byproduct=luminosity_byproduct, cardinality=cardinality, base_filters=base_filters,
+                give_weights=False)
 
 ###########################
 ### Set up checkpoints to save the model

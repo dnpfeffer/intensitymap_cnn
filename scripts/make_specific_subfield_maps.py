@@ -9,10 +9,10 @@ mapLoc = '../maps2/random_Li/'
 
 ### what model to use and if the maps should use random values or not
 model = 'Li'
-default = True
+default = False
 
 ### what level of noise to use
-noise = 11
+noise = 0
 
 ### make sure the map directory exists
 lnn.checkDirectoryPath(mapLoc)
