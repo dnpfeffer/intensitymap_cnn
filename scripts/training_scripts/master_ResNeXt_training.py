@@ -214,7 +214,7 @@ np.random.shuffle(subFields)
 np.random.seed()
 
 ### shuffle  test and validation data
-valPoint = int(len(subFields)*valPer)
+valPoint = int(len(subFields)*(1-valPer))
 base = [mapLoc + s for s in subFields[:valPoint]]
 base_val = [mapLoc + s for s in subFields[valPoint:]]
 np.random.shuffle(base)

@@ -7,13 +7,17 @@ from .ioFuncs import *
 from limlam_mocker import limlam_mocker as llm
 
 ### function to generate the luminosity function of a halo
-def makeLumFunc(halos):
+def makeLumFunc(halos, model=None):
     ### remove any halos that have no luminosity
     index = np.argwhere(halos.Lco==0.0)
     lco = np.delete(halos.Lco, index)
 
     ### generate the histogram
-    vals, bins = np.histogram(lco, bins=np.logspace(3.5,7, 50))
+    try:
+        vals, bins = np.histogram(lco, bins=np.logspace(3.5,7, 50))
+    except:
+        print(lco, np.logspace(3.5,7, 50))
+        exit(0)
 
     ### needed arrays for the actual luminosity function
     lFunc = [0]*len(vals)
@@ -32,7 +36,7 @@ def makeLumFunc(halos):
         # lCent[i] = (bins[i] + bins[i+1])/2
 
     ### return bin centers and luminosity function values
-    return([logLCent, lFunc, vals])
+    return([logLCent, lFunc, vals, model])
 
 ### function to make a map given a set of parameters
 def makeMapAndLumFunc(params, verbose=False, noise=0):
@@ -52,7 +56,7 @@ def makeMapAndLumFunc(params, verbose=False, noise=0):
     halos.Lco    = llm.Mhalo_to_Lco(halos, params.model, params.coeffs, verbose=llm.debug.verbose)
 
     ### generate the luminosity function
-    lumInfo = makeLumFunc(halos)
+    lumInfo = makeLumFunc(halos, params.model)
 
     ### Bin halo luminosities into map
     mapinst.maps = llm.Lco_to_map(halos,mapinst, verbose=llm.debug.verbose, noise=noise)
@@ -80,7 +84,7 @@ def makeAndSaveMapAndLumFunc(params, verbose=False, noise=0):
     halos.Lco    = llm.Mhalo_to_Lco(halos, params.model, params.coeffs, verbose=llm.debug.verbose)
 
     ### generate the luminosity function
-    lumInfo = makeLumFunc(halos)
+    lumInfo = makeLumFunc(halos, params.model)
 
     ### Bin halo luminosities into map
     mapinst.maps = llm.Lco_to_map(halos,mapinst, verbose=llm.debug.verbose, noise=noise)
@@ -219,7 +223,8 @@ def make_paramDict(paramDict, model=None, default=False):
         ### log_delta_mf, alpha, beta, sigma_sfr (>0), sigma_lc0 (>0)
         means = [0.0, 1.37,-1.74, 0.3, 0.3]
         ### loose priors
-        sig = [0.3, 0.37, 3.74, 0.1, 0.1]
+        # sig = [0.3, 0.37, 3.74, 0.1, 0.1]
+        sig = [0.03, 0.037, .374, 0.01, 0.01]
         ### stronger priors
         #sig = [0.3, 0.04, 0.4, 0.1, 0.1]
     elif model == 'Padmanabhan':
@@ -248,8 +253,9 @@ def make_paramDict(paramDict, model=None, default=False):
         coeffs = [np.random.normal(x,y) for x,y in zip(means, sig)]
 
         ### make sure last two parameters in the Li model are non-negative
+        ### as well as the alpha parameter
         if model == 'Li':
-            for i in [-1,-2]:
+            for i in [1, -1,-2]:
                 if coeffs[i] <= 0:
                     coeffs[i] = 1e-20
         if model == 'Padmanabhan':

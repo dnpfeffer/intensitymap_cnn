@@ -349,7 +349,7 @@ def plot_multiple_models_ratios(compare_lum, cnn_lums, model_keys, lumLogBinCent
     plt.title('Result')
     plt.ylabel('Predicted / Expected')
     plt.xlabel('L (L_sun)')
-    plt.ylim(0.85, 1.05)
+    # plt.ylim(0.85, 1.05)
     plt.show()
 
     return()

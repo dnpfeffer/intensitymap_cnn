@@ -61,7 +61,11 @@ def Mhalo_to_Lco_Li(halos, coeffs):
     lir      = sfr * 1e10 / delta_mf
     alphainv = 1./alpha
     # Lco' (observers units)
-    Lcop     = lir**alphainv * 10**(-beta * alphainv)
+    try:
+        Lcop     = lir**alphainv * 10**(-beta * alphainv)
+    except e:
+        print(lir, alphainv, beta)
+        exit(0)
     # Lco in L_sun
     Lco      =  4.9e-5 * Lcop
     Lco      = add_log_normal_scatter(Lco, sigma_lco)

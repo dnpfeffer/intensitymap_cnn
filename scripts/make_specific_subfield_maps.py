@@ -5,7 +5,7 @@ import lnn as lnn
 
 ### set the location of the halo catalogs and maps
 haloLoc = '../catalogues2/'
-mapLoc = '../maps2/random_Li/'
+mapLoc = '../maps2/random_small_Li/'
 
 ### what model to use and if the maps should use random values or not
 model = 'Li'
