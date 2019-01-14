@@ -155,10 +155,14 @@ if ThreeD:
     conv = keras.layers.Conv3D
     kernel = [kernel_size for i in range(3)]
     pool = [pool_size for i in range(3)]
+    strides = [1 for i in range(3)]
+    input_shape = (pix_x, pix_y, numb_maps,1)
 else:
     conv = keras.layers.Conv2D
     kernel = [kernel_size for i in range(2)]
     pool = [pool_size for i in range(2)]
+    strides = [1 for i in range(2)]
+    input_shape = (pix_x, pix_y, numb_maps)
 
 ### choose which loss to use
 if luminosity_byproduct == 'log':
@@ -185,22 +189,22 @@ if make_model:
     model2 = keras.Sequential()
 
     ### convolutional layer
-    model2.add(conv(base_filters, kernel_size=kernel, strides=(1,1), activation='relu', input_shape=(pix_x, pix_y, numb_maps)))
+    model2.add(conv(base_filters, kernel_size=kernel, strides=strides, activation='relu', input_shape=input_shape, padding='same'))
     ### batch normalization
     model2.add(keras.layers.BatchNormalization())
     ### use a convolution instead of a pool that acts like a pool
-    model2.add(conv(base_filters, kernel_size=pool, strides=(2,2), activation='relu'))
+    model2.add(conv(base_filters, kernel_size=pool, strides=pool, activation='relu', padding='same'))
     ### dropout for training
     model2.add(keras.layers.Dropout(droprate))
 
     ### loop through and add layers
     for i in range(2, numb_layers+1):
         ### convolutional layer
-        model2.add(conv(base_filters*(2**(i-1)), kernel, activation='relu'))
+        model2.add(conv(base_filters*(2**(i-1)), kernel, activation='relu', padding='same'))
         ### batch normalization
         model2.add(keras.layers.BatchNormalization())
         ### use a convolution instead of a pool that acts like a pool
-        model2.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=(2,2), activation='relu'))
+        model2.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=pool, activation='relu', padding='same'))
         ### dropout for training
         model2.add(keras.layers.Dropout(droprate))
 

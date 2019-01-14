@@ -9,7 +9,7 @@ from tensorflow.keras import layers, models
 ### lots of this taken from https://gist.github.com/mjdietzx/0cb95922aac14d446a6530f87b3a04ce
 def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 extra_file_name='', file_name='log_lum_6_layer_model',
-                train_number=0,
+                train_number=0, conv_layers=5,
                 droprate=0.3, numb_layers=6, base_filters=128, threeD=True,
                 luminosity_byproduct='log', kernel_size=3, cardinality=1,
                 give_weights=False, loss=keras.losses.logcosh):
@@ -99,9 +99,9 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
             x = residual_block(x, base_filters*2**2, base_filters*2**3, _strides=strides)
 
         # conv5
-        for i in range(3):
-            strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-            x = residual_block(x, base_filters*2**3, base_filters*2**4, _strides=strides)
+#        for i in range(3):
+#            strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+#            x = residual_block(x, base_filters*2**3, base_filters*2**4, _strides=strides)
 
         x = layers.GlobalAveragePooling3D()(x)
         x = layers.Dense(lum_func_size)(x)
