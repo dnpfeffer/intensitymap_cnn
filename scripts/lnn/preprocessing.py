@@ -84,6 +84,8 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
     if log_input:
         mapData = np.log10(mapData + 1e-6)
 
+        mapData += (min(mapData))
+
     if ThreeD:
         ### make sure to reshape the map data for the 3D convolutions
         mapData = mapData.reshape(len(mapData), len(mapData[0]), len(mapData[0][0]), 1)

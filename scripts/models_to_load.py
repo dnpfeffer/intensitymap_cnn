@@ -120,15 +120,19 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
     network_output = residual_network(image_tensor)
     model = models.Model(inputs=[image_tensor], outputs=[network_output])
 
+    lr = 0.001
+    momentum = 0.7
+    decay_rate = lr/100
+
     model.compile(loss=loss,
-                  optimizer=keras.optimizers.SGD(),
+                  optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
                   metrics=[keras.metrics.mse])
 
     if give_weights:
         model.load_weights(weight_file_name)
 
         model.compile(loss=loss,
-                       optimizer=keras.optimizers.SGD(),
+                       optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
                        metrics=[keras.metrics.mse])
 
     # print(weight_file_name)
@@ -302,15 +306,19 @@ def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
         ### finish it off with a dense layer with the number of output we want for our luminosity function
         master.add(keras.layers.Dense(lum_func_size, activation='linear'))
 
+        lr = 0.001
+        momentum = 0.7
+        decay_rate = lr/100
+
         master.compile(loss=loss,
-                      optimizer=keras.optimizers.SGD(),
-                      metrics=[keras.metrics.mse])
+                    optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
+                    metrics=[keras.metrics.mse])
 
     if give_weights:
         master.load_weights(weight_file_name)
 
         master.compile(loss=loss,
-                       optimizer=keras.optimizers.SGD(),
+                       optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
                        metrics=[keras.metrics.mse])
 
     # print(weight_file_name)

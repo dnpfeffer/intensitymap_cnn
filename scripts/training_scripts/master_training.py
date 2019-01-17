@@ -18,6 +18,9 @@ from limlam_mocker import limlam_mocker as llm
 from limlam_mocker import params        as params
 import lnn as lnn
 
+### load in models
+from models_to_load import *
+
 import tensorflow as tf
 from tensorflow import keras
 from keras.backend.tensorflow_backend import set_session
