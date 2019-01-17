@@ -18,6 +18,9 @@ from limlam_mocker import limlam_mocker as llm
 from limlam_mocker import params        as params
 import lnn as lnn
 
+### load in models
+from models_to_load import *
+
 import tensorflow as tf
 from tensorflow import keras
 from keras.backend.tensorflow_backend import set_session
@@ -148,6 +151,7 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 #########################
 ### Set Up the Model
 #########################
+
 make_model = True
 
 ### set which convolution to use depending on if it is 3D or not and kernel sizes
@@ -186,38 +190,12 @@ else:
     continue_name = ''
 
 if make_model:
-    model2 = keras.Sequential()
-
-    ### convolutional layer
-    model2.add(conv(base_filters, kernel_size=kernel, strides=strides, activation='relu', input_shape=input_shape, padding='same'))
-    ### batch normalization
-    model2.add(keras.layers.BatchNormalization())
-    ### use a convolution instead of a pool that acts like a pool
-    model2.add(conv(base_filters, kernel_size=pool, strides=pool, activation='relu', padding='same'))
-    ### dropout for training
-    model2.add(keras.layers.Dropout(droprate))
-
-    ### loop through and add layers
-    for i in range(2, numb_layers+1):
-        ### convolutional layer
-        model2.add(conv(base_filters*(2**(i-1)), kernel, activation='relu', padding='same'))
-        ### batch normalization
-        model2.add(keras.layers.BatchNormalization())
-        ### use a convolution instead of a pool that acts like a pool
-        model2.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=pool, activation='relu', padding='same'))
-        ### dropout for training
-        model2.add(keras.layers.Dropout(droprate))
-
-    ### flatten the network
-    model2.add(keras.layers.Flatten())
-    ### make a dense layer for the second to last step
-    model2.add(keras.layers.Dense(1000, activation='relu'))
-    ### finish it off with a dense layer with the number of output we want for our luminosity function
-    model2.add(keras.layers.Dense(lum_func_size, activation='linear'))
-
-    model2.compile(loss=loss,
-                  optimizer=keras.optimizers.SGD(),
-                  metrics=[keras.metrics.mse])
+    model2 = get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
+                extra_file_name='', file_name=fileName,
+                give_weights=False,
+                train_number=0,
+                droprate=droprate, numb_layers=numb_layers, base_filters=base_filters, threeD=ThreeD,
+                luminosity_byproduct=luminosity_byproduct, kernel_size=kernel_size)
 
 # model2.summary()
 
