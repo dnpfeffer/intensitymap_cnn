@@ -197,8 +197,14 @@ def test_model_multiple_times(model, base, luminosity_byproduct='log',
 
 ### plot the results of a single CNN and map
 def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label):
+    ### get moving average of CNN result to make it look smoother
+    window_size = 5
+    window = np.ones(window_size)/float(window_size)
+    avg = np.convolve(cnn_lum[0], window, 'same')
+
     ### plot the simulated and CNN data
     plt.semilogx(lumLogBinCents, cnn_lum[0], label='CNN')
+    plt.semilogx(lumLogBinCents[2:], avg[2:], label='Smoothed CNN')
     plt.semilogx(lumLogBinCents, cur_lum, label='Simulated')
     plt.legend()
     plt.title('CNN Result')
@@ -224,9 +230,16 @@ def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label):
 
 ### plot the ratio of a CNN's result to the underlying simulation
 def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1):
+    ### get moving average of CNN result to make it look smoother
+    window_size = 5
+    window = np.ones(window_size)/float(window_size)
+    avg = np.convolve(cnn_lum[0], window, 'same')
+
     ### plot the ratio
     ratio = cnn_lum[0]/cur_lum
-    plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off])
+    ratio_smooth = avg/cur_lum
+    plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label='CNN')
+    plt.semilogx(lumLogBinCents[2:-(end_cut_off)], ratio_smooth[2:-(end_cut_off)], label='Smoothed CNN')
 
     ### handle the title correclty based on the byproduct used
     if title == 'basic':
@@ -243,6 +256,7 @@ def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1):
 
     plt.ylabel('Predicted / Expected')
     plt.xlabel('L (L_sun)')
+    plt.legend()
 
     plt.show()
 

@@ -25,27 +25,44 @@ def fileToLum(fName):
 
 ### function to return the required luminosity function byproduct
 def lumFuncByproduct(lumInfo, lumByproduct='basic'):
-    lumResult = []
-    for i in range(len(lumInfo['lumFunc'])):
-        if lumByproduct == 'basic':
-            l = lumInfo['lumFunc'][i]
-            lumResult.append(float(l))
-        elif lumByproduct == 'log':
-            l = lumInfo['lumFunc'][i]
-            if l == 0:
-                lumResult.append(0.0)
+    if lumByproduct != 'category':
+        lumResult = []
+        for i in range(len(lumInfo['lumFunc'])):
+            if lumByproduct == 'basic':
+                l = lumInfo['lumFunc'][i]
+                lumResult.append(float(l))
+            elif lumByproduct == 'log':
+                l = lumInfo['lumFunc'][i]
+                if l == 0:
+                    lumResult.append(0.0)
+                else:
+                    lumResult.append(np.log10(float(l)))
+            elif lumByproduct == 'basicL':
+                l = lumInfo['lumFunc'][i]
+                lumResult.append(float(l * lumInfo['logBinCent'][i]))
+            elif lumByproduct == 'numberCt':
+                n = lumInfo['numberCt'][i]
+                lumResult.append(float(n))
             else:
-                lumResult.append(np.log10(float(l)))
-        elif lumByproduct == 'basicL':
-            l = lumInfo['lumFunc'][i]
-            lumResult.append(float(l * lumInfo['logBinCent'][i]))
-        elif lumByproduct == 'numberCt':
-            n = lumInfo['numberCt'][i]
-            lumResult.append(float(n))
-        else:
-            pass
+                pass
 
-    return(np.array(lumResult))
+        return(np.array(lumResult))
+    else:
+        return(lumModelToInt(lumInfo))
+
+### functiont hat converts a luminosity model into an int for categorizing
+def lumModelToInt(lumInfo):
+    model = lumInfo['model']
+    model_int = -1
+
+    if model == 'Li':
+        model_int = 0
+    elif model == '':
+        model_int = 1
+    elif model == '':
+        model_int = 2
+
+    return(model_int)
 
 ### function to convert a basename into the map map_cube and the wanted luminosity byproduct
 def fileToMapAndLum(fName, lumByproduct='basic'):

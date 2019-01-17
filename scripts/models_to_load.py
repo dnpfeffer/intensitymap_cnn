@@ -136,8 +136,6 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
 
     return(model)
 
-
-
 ##########################################################################
 ### master ###############################################################
 ##########################################################################
@@ -235,7 +233,7 @@ def get_master_(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
 ##########################################################################
 def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 extra_file_name='', file_name='full_lum_4_layer_model',
-                continue_training=False, give_weights=False,
+                give_weights=False,
                 train_number=0,
                 droprate=0.2, numb_layers=4, base_filters=16, threeD=False,
                 luminosity_byproduct='log', kernel_size=3):
@@ -273,15 +271,6 @@ def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
         loss = keras.losses.logcosh
     else:
         loss = keras.losses.mse
-
-    if continue_training:
-        continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
-
-        master = keras.models.load_model(modelLoc + fileName + '.hdf5')
-        make_model = False
-        continue_name = '_{0}'.format(continue_count)
-    else:
-        continue_name = ''
 
     if make_model:
         master = keras.Sequential()
@@ -328,6 +317,57 @@ def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
     # master.summary()
 
     return(master)
+
+##########################################################################
+### Categorizer ##########################################################
+##########################################################################
+def get_master_categorizer(modelLoc, pix_x, pix_y, numb_maps, base_model=get_master_2,
+                extra_file_name='', file_name='full_lum_4_layer_model',
+                train_number=0, base_file_name='',
+                give_weights=False, use_base_weights=False, **kwargs):
+
+    if 'threeD' in kwargs:
+        threeD = kwargs['threeD']
+    else:
+        threeD = False
+
+    master = base_model(modelLoc, pix_x, pix_y, numb_maps, 1,
+        extra_file_name=extra_file_name, file_name=base_file_name,
+        give_weights=use_base_weights, train_number=train_number,
+        **kwargs)
+
+    master.layers.pop()
+    master.layers.pop()
+
+    x = master.layers[-1].output
+    if threeD:
+        x = layers.GlobalAveragePooling3D()(x)
+    else:
+        x = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dense(500, activation='relu')(x)
+    o = layers.Dense(3, activation='relu')(x)
+
+    master_categorizer = models.Model(inputs=master.layers[0].input, outpus=o)
+
+    master_categorizer.compile(loss=keras.losses.categorical_crossentropy,
+                   optimizer=keras.optimizers.Adam(),
+                   metrics=[keras.metrics.categorical_accuracy])
+
+    if give_weights:
+        ### get the weights file name
+        weight_file_name = modelLoc + file_name + extra_file_name + '_weights'
+        if train_number > 0:
+            weight_file_name += '_{0}'.format(int(train_number))
+        weight_file_name += '.hdf5'
+
+        master_categorizer.load_weights(weight_file_name)
+
+        master_categorizer.compile(loss=keras.losses.categorical_crossentropy,
+                       optimizer=keras.optimizers.Adam(),
+                       metrics=[keras.metrics.categorical_accuracy])
+
+    return(master_categorizer)
+
 
 ##########################################################################
 ### full_lum_4_layer #####################################################
