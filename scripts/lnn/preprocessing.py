@@ -1,6 +1,8 @@
 import numpy as np
 #import tensorflow as tf
 
+from skimage.measure import block_reduce
+
 from .ioFuncs import *
 
 ### needed to save the map
@@ -73,13 +75,20 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
     return(mapData, lumData)
 
 ### function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
-def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False, make_map_noisy=0):
+def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
+    make_map_noisy=0, pre_pool=1):
     lumByproduct = lumByproduct.decode("utf-8")
     mapData, lumData = fileToMapAndLum(fName.decode('utf-8'), lumByproduct)
 
     ### add gaussian noise, but make sure it is positive valued
     if make_map_noisy > 0:
-        mapData = mapData + np.absolute(np.random.normal(0, 11, mapData.shape))
+        mapData = mapData + np.absolute(np.random.normal(0, make_map_noisy, mapData.shape))
+
+    if pre_pool > 1:
+        if len(mapData)%pre_pool == 0:
+            mapData = block_reduce(mapData, (pre_pool, pre_pool, 1), np.sum)
+        else:
+            pass
 
     if log_input:
         mapData = np.log10(mapData + 1e-6)

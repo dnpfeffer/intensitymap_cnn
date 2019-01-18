@@ -74,6 +74,10 @@ base_filters = 32
 kernel_size = 3
 pool_size = 2
 
+### size of pooling that should be done on maps before they are used
+### only pools in x and y direction, not z (actually redshift / frequency)
+pre_pool = 1
+
 ### cardinality
 cardinality = 1 #32
 
@@ -115,6 +119,7 @@ parser.add_argument('-mal', '--map_loc', default=mapLoc, help='Location of maps'
 parser.add_argument('-cl', '--cat_loc', default=catLoc, help='Location of catalogs')
 parser.add_argument('-mol', '--model_loc', default=modelLoc, help='Location of models')
 parser.add_argument('-ca', '--cardinality', type=int, default=cardinality, help='Cardinality of ResNeXt')
+parser.add_argument('-pp', '--pre_pool', default=pre_pool, help='Kernel size for prepooling maps')
 
 
 ### read in values for all of the argumnets
@@ -135,6 +140,7 @@ log_input = args.log_input
 make_map_noisy = args.make_map_noisy
 kernel_size = args.kernel_size
 cardinality = args.cardinality
+pre_pool = args.pre_pool
 
 ### set the continue training name
 continue_training_model_loc = fileName + '_temp.hdf5'
@@ -146,6 +152,17 @@ if fileName == '':
 mapLoc = '../../maps2/{0}/'.format(args.map_loc)
 catLoc = '../../{0}/'.format(args.cat_loc)
 modelLoc = '../../{0}/'.format(args.model_loc)
+
+### if there is a non-one pre_pool value, change the pix_x and pix_x accordingly
+if pix_x % pre_pool == 0:
+     pix_x /= pre_pool
+else:
+    sys.exit('The pix_x value ({0}) must be divisible by the pre-pooling kernel size ({1})'.format(pix_x, pre_pool))
+
+if pix_y % pre_pool == 0:
+     pix_y /= pre_pool
+else:
+    sys.exit('The pix_y value ({0}) must be divisible by the pre-pooling kernel size ({1})'.format(pix_y, pre_pool))
 
 ### set up how much memory the gpus use
 config = tf.ConfigProto()

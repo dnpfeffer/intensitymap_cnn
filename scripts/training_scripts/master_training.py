@@ -75,6 +75,10 @@ base_filters = 16
 kernel_size = 5
 pool_size = 2
 
+### size of pooling that should be done on maps before they are used
+### only pools in x and y direction, not z (actually redshift / frequency)
+pre_pool = 1
+
 
 ### variables for what we are training on
 ThreeD = False
@@ -113,6 +117,7 @@ parser.add_argument('-ks', '--kernel_size', type=int, default=kernel_size, help=
 parser.add_argument('-mal', '--map_loc', default=mapLoc, help='Location of maps')
 parser.add_argument('-cl', '--cat_loc', default=catLoc, help='Location of catalogs')
 parser.add_argument('-mol', '--model_loc', default=modelLoc, help='Location of models')
+parser.add_argument('-pp', '--pre_pool', default=pre_pool, help='Kernel size for prepooling maps')
 
 
 ### read in values for all of the argumnets
@@ -132,6 +137,7 @@ luminosity_byproduct = args.luminosity_byproduct
 log_input = args.log_input
 make_map_noisy = args.make_map_noisy
 kernel_size = args.kernel_size
+pre_pool = args.pre_pool
 
 if fileName == '':
     fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
@@ -139,6 +145,17 @@ if fileName == '':
 mapLoc = '../../maps2/{0}/'.format(args.map_loc)
 catLoc = '../../{0}/'.format(args.cat_loc)
 modelLoc = '../../{0}/'.format(args.model_loc)
+
+### if there is a non-one pre_pool value, change the pix_x and pix_x accordingly
+if pix_x % pre_pool == 0:
+     pix_x /= pre_pool
+else:
+    sys.exit('The pix_x value ({0}) must be divisible by the pre-pooling kernel size ({1})'.format(pix_x, pre_pool))
+
+if pix_y % pre_pool == 0:
+     pix_y /= pre_pool
+else:
+    sys.exit('The pix_y value ({0}) must be divisible by the pre-pooling kernel size ({1})'.format(pix_y, pre_pool))
 
 ### set up how much memory the gpus use
 config = tf.ConfigProto()
@@ -224,13 +241,13 @@ np.random.shuffle(base_val)
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy, pre_pool], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
 dataset_val = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base_val))
 dataset_val = dataset_val.shuffle(buffer_size=len(base_val))
-dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy], [tf.float64, tf.float64])))
+dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy, pre_pool], [tf.float64, tf.float64])))
 dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
