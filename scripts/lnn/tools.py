@@ -71,11 +71,12 @@ def convert_lum_to_log(lum, luminosity_product, lumLogBinCents):
 
 ### handle booleans for argument parsing
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ('no', 'false', 'f', 'n', '0', 'False'):
         return False
     else:
+        print(v)
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 ### make a file name from the given model information
@@ -143,14 +144,27 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 
 ### get the predicted and simulated luminosity function byproduct for a given model and map
 def test_model(model, base, base_number, luminosity_byproduct='log', threeD=False,
-                evaluate=True, log_input=False, make_map_noisy=0):
+                evaluate=True, log_input=False, make_map_noisy=0,
+                pre_pool=1):
     ### get the simulated map and luminosity byproduct
-    cur_map = fileToMapData(base[base_number] + '_map.npz', log_input=log_input)
-    cur_lum = lumFuncByproduct(fileToLum(base[base_number] + '_lum.npz'), luminosity_byproduct)
+    # cur_map = fileToMapData(base[base_number] + '_map.npz', log_input=log_input)
+    # cur_lum = lumFuncByproduct(fileToLum(base[base_number] + '_lum.npz'), luminosity_byproduct)
+
+    cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
 
     ### add gaussian noise, but make sure it is positive valued
     if make_map_noisy > 0:
         cur_map = cur_map + np.absolute(np.random.normal(0, make_map_noisy, cur_map.shape))
+
+    if pre_pool > 1:
+        if len(cur_map)%pre_pool == 0:
+            cur_map = block_reduce(cur_map, (pre_pool, pre_pool, 25), np.sum)
+        else:
+            pass
+
+    if log_input:
+        cur_map = np.log10(cur_map + 1e-6)
+        cur_map -= (np.min(cur_map))
 
     ### Handle 3D maps correctly
     if threeD:

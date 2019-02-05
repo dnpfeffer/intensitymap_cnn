@@ -78,15 +78,13 @@ use_bias = True
 kernel_size = 5
 pool_size = 2
 
-### cardinality of 1 gives a resnet architecture
-cardinality = 1
-
 ### final dense layer size
 dense_layer = 1000
 
 ### size of pooling that should be done on maps before they are used
 ### only pools in x and y direction, not z (actually redshift / frequency)
 pre_pool = 1
+pre_pool_z = 25
 
 
 ### variables for what we are training on
@@ -126,11 +124,11 @@ parser.add_argument('-ks', '--kernel_size', type=int, default=kernel_size, help=
 parser.add_argument('-mal', '--map_loc', default=mapLoc, help='Location of maps')
 parser.add_argument('-cl', '--cat_loc', default=catLoc, help='Location of catalogs')
 parser.add_argument('-mol', '--model_loc', default=modelLoc, help='Location of models')
-parser.add_argument('-ca', '--cardinality', type=int, default=cardinality, help='Cardinality of ResNeXt')
 parser.add_argument('-pp', '--pre_pool', type=int, default=pre_pool, help='Kernel size for prepooling maps')
 parser.add_argument('-dl', '--dense_layer', type=int, default=dense_layer, help='Size of the final dense layer')
 parser.add_argument('-lfs', '--lum_func_size', type=int, default=lum_func_size, help='Number of luminosity bins to fit for')
 parser.add_argument('-ub', '--use_bias', type=lnn.str2bool, default=use_bias, help='Use the biases in the model')
+parser.add_argument('-ppz', '--pre_pool_z', type=int, default=pre_pool_z, help='Kernel size for prepooling in z direction for maps')
 
 
 ### read in values for all of the argumnets
@@ -150,11 +148,11 @@ luminosity_byproduct = args.luminosity_byproduct
 log_input = args.log_input
 make_map_noisy = args.make_map_noisy
 kernel_size = args.kernel_size
-cardinality = args.cardinality
 pre_pool = args.pre_pool
 dense_layer = args.dense_layer
 lum_func_size = args.lum_func_size
 use_bias = args.use_bias
+pre_pool_z = args.pre_pool_z
 
 if fileName == '':
     fileName = lnn.make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters)
@@ -174,6 +172,12 @@ if pix_y % pre_pool == 0:
 else:
     sys.exit('The pix_y value ({0}) must be divisible by the pre-pooling kernel size ({1})'.format(pix_y, pre_pool))
 
+if numb_maps % pre_pool_z == 0:
+     numb_maps /= pre_pool_z
+else:
+    sys.exit('The numb_maps value ({0}) must be divisible by the pre-pooling-z size ({1})'.format(numb_maps, pre_pool_z))
+
+
 ### set up how much memory the gpus use
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -185,10 +189,11 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 #########################
 ### Set Up the Model
 #########################
+
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
 
-    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
+    master = keras.models.load_model(modelLoc + fileName + '.hdf5')
     make_model = False
     continue_name = '_{0}'.format(continue_count)
 else:
@@ -206,9 +211,15 @@ elif luminosity_byproduct == 'numberCt':
 else:
     loss = keras.losses.mse
 
-model2 = get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
-                luminosity_byproduct=luminosity_byproduct, cardinality=cardinality, base_filters=base_filters,
-                give_weights=False, loss=loss)
+model2 = get_master_ann(modelLoc, pix_x, pix_y, numb_maps,
+                abs(lum_func_size),
+                train_number=0,
+                droprate=droprate, numb_layers=numb_layers,
+                base_filters=base_filters,
+                luminosity_byproduct=luminosity_byproduct,
+                use_bias=use_bias)
+
+# model2.summary()
 
 ###########################
 ### Set up checkpoints to save the model
@@ -256,19 +267,19 @@ np.random.shuffle(base_val)
 
 dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
 dataset = dataset.shuffle(buffer_size=len(base))
-dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy, pre_pool, lum_func_size], [tf.float64, tf.float64])))
+dataset = dataset.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy, pre_pool, pre_pool_z, lum_func_size], [tf.float64, tf.float64])))
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
 
 dataset_val = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base_val))
 dataset_val = dataset_val.shuffle(buffer_size=len(base_val))
-dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy, pre_pool, lum_func_size], [tf.float64, tf.float64])))
+dataset_val = dataset_val.map(lambda item: tuple(tf.py_func(lnn.utf8FileToMapAndLum, [item, luminosity_byproduct, ThreeD, log_input, make_map_noisy, pre_pool, pre_pool_z, lum_func_size], [tf.float64, tf.float64])))
 dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
-lr = 0.01 #0.001
+lr = 0.001 #0.001
 momentum = 0.0 #0.7
-decay_rate = 0.0 #lr/100
+decay_rate = lr/100
 
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
 multi_gpu_model2.compile(loss=loss,
