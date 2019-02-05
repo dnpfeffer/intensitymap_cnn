@@ -119,7 +119,7 @@ parser.add_argument('-mal', '--map_loc', default=mapLoc, help='Location of maps'
 parser.add_argument('-cl', '--cat_loc', default=catLoc, help='Location of catalogs')
 parser.add_argument('-mol', '--model_loc', default=modelLoc, help='Location of models')
 parser.add_argument('-ca', '--cardinality', type=int, default=cardinality, help='Cardinality of ResNeXt')
-parser.add_argument('-pp', '--pre_pool', default=pre_pool, help='Kernel size for prepooling maps')
+parser.add_argument('-pp', '--pre_pool', type=int, default=pre_pool, help='Kernel size for prepooling maps')
 
 
 ### read in values for all of the argumnets

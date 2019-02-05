@@ -97,7 +97,7 @@ def loadDirNpzs(loc):
     names = []
 
     ### iterate over each item in a directory and store the base names
-    for p in path.iterdir():
+    for p in sorted(list(path.iterdir())):
         ### ignore files that begin with '.'
         ### ignore directories
         if p.name[0] == '.' or '/' in p.name:

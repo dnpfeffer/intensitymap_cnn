@@ -76,27 +76,61 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
 
 ### function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
 def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
-    make_map_noisy=0, pre_pool=1):
+                        make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
     lumByproduct = lumByproduct.decode("utf-8")
     mapData, lumData = fileToMapAndLum(fName.decode('utf-8'), lumByproduct)
 
-    ### add gaussian noise, but make sure it is positive valued
+    #########################
+    # very temp thing that needs to be done correctly later
+    # make some maps have only zeros and the lum func be zero as well
+    # randomly scale things that aren't zero
+    ########################
+    if np.random.rand() < 0.1:
+        # mapData = np.zeros(mapData.shape)
+        # lumData = np.zeros(lumData.shape)
+        pass
+    else:
+        # lumLogBinCents = loadLogBinCenters(fName.decode('utf-8'))
+        # # bin_index_diff = np.random.randint(0, len(lumLogBinCents)-1)
+        # bin_index_diff = int(np.random.poisson(5))
+        # mapData, lumData = scaleMapAndLum(
+        #     mapData, lumData, lumLogBinCents, bin_index_diff)
+        pass
+    ########################
+    #######################
+
+    # add gaussian noise, but make sure it is positive valued
     if make_map_noisy > 0:
-        mapData = mapData + np.absolute(np.random.normal(0, make_map_noisy, mapData.shape))
+        mapData = mapData + \
+            np.absolute(np.random.normal(0, make_map_noisy, mapData.shape))
 
     if pre_pool > 1:
-        if len(mapData)%pre_pool == 0:
-            mapData = block_reduce(mapData, (pre_pool, pre_pool, 1), np.sum)
+        if len(mapData) % pre_pool == 0:
+            mapData = block_reduce(
+                mapData, (pre_pool, pre_pool, pre_pool_z), np.sum)
         else:
             pass
 
     if log_input:
         mapData = np.log10(mapData + 1e-6)
 
-        mapData += (min(mapData))
+        mapData -= (np.min(mapData))
+
+    # mean_map = np.mean(mapData)
+    # std_map = np.std(mapData)
+
+    # mapData = (mapData - mean_map)/std_map
+
+    if lum_func_size is not None:
+        if lum_func_size >= 1:
+            # lumData = lumData[::lum_func_size]
+            lumData = lumData[:lum_func_size]
+        else:
+            lumData = lumData[lum_func_size:]
 
     if ThreeD:
-        ### make sure to reshape the map data for the 3D convolutions
-        mapData = mapData.reshape(len(mapData), len(mapData[0]), len(mapData[0][0]), 1)
+        # make sure to reshape the map data for the 3D convolutions
+        mapData = mapData.reshape(len(mapData), len(
+            mapData[0]), len(mapData[0][0]), 1)
 
     return(mapData, lumData)
