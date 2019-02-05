@@ -53,6 +53,16 @@
 
 			\item Compare to Power Spectrum Method \ref{sec:power_compare}
 
+			\item Accidentally Memorizing \ref{sec:mem}
+
+			\item Using Random Parameters in Models \ref{sec:rand}
+
+			\item Comparing Multiple Models \ref{sec:mult}
+
+			\item Memorization Realization \ref{sec:ohcrap}
+
+			\item Something Finally Works \ref{sec:works}
+
 			\item To do list \ref{sec:todo}
 		\end{enumerate}	
 
@@ -492,38 +502,163 @@
 
 		\begin{figure}[H]
 			\centering
-			\includegraphics[width=1.2\textwidth]{no_noise_compare.pdf}
+			\includegraphics[width=1.1\textwidth]{no_noise_compare.pdf}
 			\caption{Comparison of different methods to determine the underlying luminosity function of an intensity map.  The shaded regions are the 95\% credibility interval or the 2 \(\sigma\) error bounds.}
 			\label{fig:no_noise_compare}
 		\end{figure}
 
 		\begin{figure}[H]
 			\centering
-			\includegraphics[width=1.2\textwidth]{noise_compare.pdf}
+			\includegraphics[width=1.1\textwidth]{noise_compare.pdf}
 			\caption{Same as \cref{fig:no_noise_compare}, but with 11 \(\mu K\) white noise.}
 			\label{fig:noise_compare}
 		\end{figure}
 
+	\section{Accidentally Memorizing} \label{sec:mem}
+		After training a model on the Li et al model we wanted to test how good it could do with an intensity map produced with another underlying model.  \cref{fig:Li_Model_with_Padmanabhan} shows the result of that and it is not good.  It appears that the CNN memorized the basic structure of the Li model rather then learning anything.  Because of this we need(ed) to do more testing.  
 
-	\section{Training and Testing On Many Models} \label{sec:tat}
-		\dnp{This stuff should be a second topic after testing with just white noise and seeing how good it is}
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.8\textwidth]{Li_Model_with_Padmanabhan.pdf}
+			\caption{The prediction of a CNN trained on Li models when tested on an intensity map produced by a Padmanabhan model.}
+			\label{fig:Li_Model_with_Padmanabhan}
+		\end{figure}
 
-		Once we determine what architectures we are using we must determine what we want to train and test our networks on.  As of right now we have 3 luminosity models with uncertainty on parameters.  The only noise currently implemented is white noise.
+	\section{Using Random Parameters in Models} \label{sec:rand}
+		Because of the memorization that happened in \cref{sec:mem} we needed to train a model on more then data produced with the base parameters for a model.  Each model we use has parameters in them that must be set to convert the halo catalog into a number of halos that then get converted to an intensity map.  Originally we were testing on maps made using the Li model but with the best fit parameters.  By changing these parameters we would change the number of halos expected to be in each map.  This change in number of halos will lead to different intensity maps.
 
-		We'll need to see what maps we want to train on.  Some possible things to train on are as follows.
-		\begin{enumerate}
-			\item All base luminosity models (Just a single model at a time)
+		Intensity maps were made using a different realization of the Li model for each map with a random draw of what the needed parameter values would be.  These maps were then used to a train a CNN and it was a failure.  It had no predictive powers.  The reason why can be seen in \cref{fig:variation_in_Li}.  The range of different luminosity functions produced is huge.  There is too much to try and learn.  It is not learning variations of a general pattern or two, it is trying to learn many completely different things.  A simple model should not be able to learn this.
 
-			\item All luminosity models with random values used for parameters in each map (Just a single model at a time)
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.0\textwidth]{variation_in_Li.pdf}
+			\caption{The solid line is the ratio of the mean luminosity function for 1000 realizations of Li intensity maps to the value of the mean at the lowest luminosity value.  The filled in region is related to the 2 \(\sigma\) region.  The limits are just mean \(\pm 2 \sigma\) where \(\sigma\) is calculated for each luminosity \(L\).  The upper limit is correct, but the bottom one doesn't really mean anything.}
+			\label{fig:variation_in_Li}
+		\end{figure}
 
-			\item Combined models with base parameters
+		If instead we were to look at the variation produced when using the default values we would get \cref{fig:variation_in_default_Li}.  The variation is much smaller.  If instead we look at \cref{fig:variation_in_default_Li_local} we see the variation is around 5-10\% for the most part.  Now comparing to \cref{fig:noise_compare} we see variation of the 6 layer model is actually slightly less then the 5-10\% expected by looking at different views of the catalog that produces the intensity maps.  This means the CNN is learning something more then just the basic shape of the default values.  If it didn't, it would have variation on the same order.  \dnp{This seems good!}
 
-			\item Combined models with random parameters
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.0\textwidth]{variation_in_default_Li.pdf}
+			\caption{Same as \cref{fig:variation_in_Li}, but when only using the default parameters in the Li model when producing intensity maps.}
+			\label{fig:variation_in_default_Li}
+		\end{figure}
 
-			\item All previous scenarios with noise added
-		\end{enumerate}
-		From this we need to determine which model works best in each scenario that matters.  My naive guess would be models trained on noise will be better with noise and models without noise would be better for future experiments with less noise.
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=1.0\textwidth]{variation_in_default_Li_local.pdf}
+			\caption{Similar to \cref{fig:variation_in_default_Li}, but instead of get the ratio with respect to the value of the mean at the lowest luminosity, finds the ratio with respect to the mean at every luminosity.  This allows us to see variations relative to the mean at each luminosity.}
+			\label{fig:variation_in_default_Li_local}
+		\end{figure}
 
+	\section{Comparing Multiple Models} \label{sec:mult}
+		Besides testing with random draws of parameter models we also tested using multiple models at once.  The models tested where the Li, Padmanabhan and Breysse (power law) models and used the default parameters.  As was par for the course, this failed as well and can be seen in \cref{fig:multi_model_Padmanabhan,fig:multi_model_Li,fig:multi_model_Breysse}.  These figures are representative of their respective models.  I believe the reason for this is due to the power law model not extending far enough down to low intensities.  This drop at lower luminosity to the zero sources is a much different feature then anything and in my opinion is probably what makes this not work out well.  \dnp{I have no proof of that at the moment.}  That being said, this does seem to work as a classifier.  The prediction for each model is different for each model.  I don't know how much work it would be, but I think this trained CNN could be used to jump start the training of a classifier with similar architecture.  The final layer of the current CNN would need to be replaced with 3 neurons instead of 50 where each neuron represents a model instead of a value of the luminosity function.  \dnp{Maybe try to do this without Breysse model.}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{multi_model_Padmanabhan.pdf}
+			\caption{Multi model CNN trying to predict the luminosity function from an underlying Padmanabhan model.  The CNN was trained on Li, Padmanabhan and Breysse models.}
+			\label{fig:multi_model_Padmanabhan}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{multi_model_Li.pdf}
+			\caption{Same as \cref{fig:multi_model_Padmanabhan} but with an underlying Li model.}
+			\label{fig:multi_model_Li}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{multi_model_Breysse.pdf}
+			\caption{Same as \cref{fig:multi_model_Padmanabhan} but with an underlying Breysse model.}
+			\label{fig:multi_model_Breysse}
+		\end{figure}
+
+	\section{Memorization Realization} \label{sec:ohcrap}
+
+		For the past couple weeks I have been trying to get a CNN to predict the luminosity function from maps made with a single model, but varying parameters as seen in \cref{sec:rand}.  The point is to learn how to actually read the map and learn to count the number of sources directly from it.  I have no come to the full realization that we have so far not done anything like that.  What has been happening is that the network learns the least offensive luminosity function and more or less just sticks with that.  Least offensive here is meaning that this is the default luminosity function that will minimize loss for the entire dataset without any change.  It then tries to learn small perturbations on top of it.  This works for a single realization of an underlying model because the changes to the expected luminosity function in a given map are very small.  This does not work when you vary underlying model parameters.
+
+		I've been trying many different models to learn to read maps made with varying parameters, but nothing has worked so far.  I've tried 2D and 3D basic models and a resnet model.  I've tried with more layers and filters as well as lowering the learning and tweaking hyper parameters.  The same thing happens for all of them, the training loss data reaches a constant value (around 0.1 - 0.3) and stays there for the entire training process.  The validation loss data just fluctuates.  An example of this is seen in \cref{fig:failed_learning}.  The output luminosity function barely changes between maps.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{failed_learning.pdf}
+			\caption{Training and validation loss and metrics for the training of a resnet CNN.  It should be clear that the training data didn't learn anything.  It memorized something at the very beginning and stuck with it.  The network was trained on maps made with small variation of parameters in the Li model.}
+			\label{fig:failed_learning}
+		\end{figure}
+
+		The failure of the models to learn anything can be seen in \cref{fig:no_intensity}.  The input that led to this luminosity function was actually a blank map.  Every value in it was set to 0.  We see that the CNN just ignored the input for the most part and just always made the same luminosity function with tiny changes on it.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{no_intensity.pdf}
+			\caption{The CNN and smoothed CNN lines here are the result of a CNN given an empty intensity map (every value was 0 in it).  The network was trained on maps made with small variation of parameters in the Li model.  Ignore the green simulated line.}
+			\label{fig:no_intensity}
+		\end{figure}
+
+		So now we need to figure out how to get around this and do what we wanted to do from the beginning.  We need to just learn how to translate a map directly to the number of sources in a luminosity bin.  One possible issue is that the intensity maps are very sparse.  Around 90\% of pixels have no luminosity in them.  What the CNNs have been doing is more or less ignoring the input and just using the initial biases.  I'm starting to try and shrink the size of the maps before being used.  If instead of 256x256 for each image we used 128x128 or 64x64 we would get 25\% and 50\% of pixels having non-zero values respectively.  With this non-sparse data hopefully the network actually learns rather than memorizes.
+
+		Making the maps smaller didn't help... \\
+
+		I don't know if it was mentioned in here yet, but instead of working with maps made using an underlying Li luminosity function and the fiducial mean and errors I used one with the fiducial mean, but only 10\% of the fiducial errors.  The idea is that it would lower the expected output parameter space.  This didn't fix things.
+
+		Messing around with what the dropout was and where it was located didn't really help.  I also tried using specific pooling functions instead of convolutions that pool and that didn't really do anything.  One thing that had a minor result is removing the bias value from the first layer.  The idea was that if the weights were small for the first layer and the bias big it could be that the map was ignored and the bias value determining most things.  This seems to be true considering that an empty map gave the same output as a non-empty one.  Removing the bias helped a small amount.  Removing it gave the same general shape, but allowed the amplitude at low luminosity to go up and down some.  It was not a real fix.
+
+		I'm annoyed at how simple the solution was, but whatever, better late then never.  What got things working at the end was switching over to using Adam for the optimizer instead of stochastic gradient descent (SGD).  \dnp{I should make sure I fully understand Adam at some point.}
+
+	\section{Something Finally works} \label{sec:works}
+		After switching over to Adam I got a run to work.  I first tried to train on only 12 maps and make sure it could over-fit, which it did, then I moved on to 500 maps.  The results with 500 maps was wonderful.  It's fitting the entire dataset really well after 100 epochs.
+
+		The network that is currently working is as follows
+		\begin{itemize}
+			\item 6 layers.  Each layer is a convolution with batch normalization, dropout and then another convolution that acts as a pooling layer.
+			\item 2 dense layers at the end.  The first has 1000 neurons and the second and last layer of the network has 49, one for each output.
+			\item 64 filters on the first convolutional layer and doubling every layer.
+			\item 50\% dropout
+			\item 0-padded sides
+			\item 3d convolutions with kernel size 3
+			\item Pooling done with 3d convolutions with kernel size 2 and stride 2
+		\end{itemize}
+
+		The data the network trained on was as follows
+		\begin{itemize}
+			\item Maps are pre-pooled.  Instead of being 256X256X100 I am using 64X64X10 maps.  I pool by converting 4X4X10 regions into a single pixel with the intensity being the sum of all of the previous individual ones.
+			\item The output luminosity function is log valued
+			\item The input map is given an extra intensity of 1e-6 for each pixel and then log valued.  The extra 1e-6 intensity prevents taking the log of 0.  Finally every pixel in the log map gets an extra 6 added to it so that pixels with no intensity would have 0 intensity in whatever new units we have. 
+			\item I used only 500 maps for training data.  I was starting with a low number (12) to make sure overfitting could happen.  It did then I was going to slowly increase up to 80\% of the total number of maps (<6000 maps at the moment), but using only 500 maps worked really well.
+			\item The maps being used were done using a Li model for the underlying luminosity function with the fiducial mean, but errors that were 10\% of reported ones.  I tried using the full error, but it does not work for this setup.  It hasn’t finished running at the moment, but it’s validation loss is not anywhere near anything good.
+			\item Batch size of 40 maps, 100 steps in an epoch (400 maps looked at) and 100 epochs of training.
+			\item Validation testing uses 3 steps with the batch size of 40 (120 maps for validation each epoch).
+		\end{itemize}
+
+		Figure \ref{fig:adam_good} is of a fairly typical fit of the CNN to a map.  It’s good.  This current CNN when predicting the luminosity function on maps made with different underlying luminosity functions is just as good as our old CNN was for predicting the luminosity function of maps made with the same Li model parameters.  I can tell this because when tested over many maps they give the same training error.  They both gave ~0.006 which doesn’t mean much on it’s own, but you want to minimize that and they both give the same value.  This is good because we are fitting to more complicated data better or just as good as we “fit” to data that was nearly always the same.
+
+		Figure \ref{fig:adam_good_2} shows that the CNN has a little issue when there are not high luminosity objects.  That region is noisy and it likes making smooth curves that don't pick up that noise and the drop to 0 objects perfectly.  It is still good at getting the general tend.  It also can’t handle actual noise yet.  Adding even 1 micro Kelvin messes with the prediction a lot and brings the loss to around 0.5.  Remember that it gives a loss around 0.006 for no noise.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{adam_good.pdf}
+			\caption{}
+			\label{fig:adam_good}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{adam_good_2.pdf}
+			\caption{}
+			\label{fig:adam_good_2}
+		\end{figure}
+
+		Figure \ref{fig:adam_training} shows the training history for the CNN.  For this the loss function was changed to mean\_squared\_error so ``loss'' and ``mean\_squared\_error'' on the plot are the same thing.  The validation data has some large spikes.  This may be due to some maps in the validation data being a decent bit different then the other ones.  This can be investigated later.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{adam_training.pdf}
+			\caption{}
+			\label{fig:adam_training}
+		\end{figure}
 
 	\section{Things to do for Dan in no particular order} \label{sec:todo}
 		\begin{enumerate}
@@ -553,11 +688,15 @@
 
 			\item \sout{See how many filters / layers the gpus can handle for 2D convolutions}
 
-			\item \sout{Figure out what architecture we actually want to use and start the actual training and testing.  Log input or not, \(\phi\) v.s. \(N\), \# of layers, \# of filters.}  6 layers, 32 initial filters, full input, log output, \(dN/dL\) with log spacing of L.
+			\item \sout{Figure out what architecture we actually want to use and start the actual training and testing.  Log input or not, \(\phi\) v.s. \(N\), \# of layers, \# of filters.}  6 layers, 32 initial filters, full input, log output, \(dN/dL\) with log spacing of L.  Actually have a ResNet architecture that works well.
 
 			\item Put info in about visualizing layers?  Can do this, but do we care right now?
 
 			\item Foregrounds?
+
+			\item Classifier between models?
+
+			\item More testing around working Adam model.  Expanded maps, train on full data instead of 500 maps, add in noise.
 		\end{enumerate}
 
 

@@ -1,5 +1,5 @@
-### import ML stuff
-import tensorflow as tf
+# import ML stuff
+# import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, models
 
@@ -345,6 +345,7 @@ def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
     if threeD:
         conv = keras.layers.Conv3D
         kernel = [kernel_size for i in range(3)]
+        kernel[-1] = 3
         pool = [pool_size for i in range(3)]
         strides = [1 for i in range(3)]
         input_shape = (pix_x, pix_y, numb_maps,1)
@@ -371,29 +372,34 @@ def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
         master = keras.Sequential()
 
         ### convolutional layer
-        master.add(conv(base_filters, kernel_size=kernel, strides=strides, activation='sigmoid', input_shape=input_shape,
-        padding='same', use_bias=False))
+        master.add(conv(base_filters, kernel_size=kernel, strides=strides, activation='relu', input_shape=input_shape,
+            padding='same', use_bias=False))
         ### batch normalization
         master.add(keras.layers.BatchNormalization())
         ### dropout for training
         master.add(keras.layers.Dropout(droprate))
         ### use a convolution instead of a pool that acts like a pool
-        master.add(conv(base_filters, kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=use_bias))
-        # ### dropout for training
-        # master.add(keras.layers.Dropout(droprate))
+        master.add(conv(base_filters, kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=False))
+
+        ### convolutional layer
+        master.add(conv(base_filters*2, kernel, activation='relu', padding='same', use_bias=False))
+        ### batch normalization
+        master.add(keras.layers.BatchNormalization())
+        ### dropout for training
+        master.add(keras.layers.Dropout(droprate))
+        ### use a convolution instead of a pool that acts like a pool
+        master.add(conv(base_filters*2, kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=False))
 
         ### loop through and add layers
-        for i in range(2, numb_layers+1):
+        for i in range(3, numb_layers+1):
             ### convolutional layer
-            master.add(conv(base_filters*(2**(i-1)), kernel, activation='sigmoid', padding='same', use_bias=use_bias))
+            master.add(conv(base_filters*(2**(i-1)), kernel, activation='relu', padding='same', use_bias=use_bias))
             ### batch normalization
             master.add(keras.layers.BatchNormalization())
             ### dropout for training
             master.add(keras.layers.Dropout(droprate))
             ### use a convolution instead of a pool that acts like a pool
             master.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=use_bias))
-            # ### dropout for training
-            # master.add(keras.layers.Dropout(droprate))
 
         ### flatten the network
         master.add(keras.layers.Flatten())
@@ -417,6 +423,294 @@ def get_master_2(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
 
         master.compile(loss=loss,
                        optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
+                       metrics=[keras.metrics.mse])
+
+    # print(weight_file_name)
+    # master.summary()
+
+    return(master)
+
+##########################################################################
+### master3 ###############################################################
+##########################################################################
+def get_master_3(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
+                extra_file_name='', file_name='full_lum_4_layer_model',
+                give_weights=False,
+                train_number=0,
+                droprate=0.2, numb_layers=4, base_filters=16, threeD=False,
+                luminosity_byproduct='log', kernel_size=3,
+                dense_layer=1000, use_bias=True):
+
+    ### get the weights file name
+    weight_file_name = modelLoc + file_name + extra_file_name + '_weights'
+    if train_number > 0:
+        weight_file_name += '_{0}'.format(int(train_number))
+    weight_file_name += '.hdf5'
+
+    ### set which convolution to use depending on if it is 3D or not and kernel sizes
+    make_model = True
+    pool_size = 2
+    if threeD:
+        conv = keras.layers.Conv3D
+        kernel = [kernel_size for i in range(3)]
+        pool = [pool_size for i in range(3)]
+        strides = [1 for i in range(3)]
+        input_shape = (pix_x, pix_y, numb_maps,1)
+    else:
+        conv = keras.layers.Conv2D
+        kernel = [kernel_size for i in range(2)]
+        pool = [pool_size for i in range(2)]
+        strides = [1 for i in range(2)]
+        input_shape = (pix_x, pix_y, numb_maps)
+
+    ### choose which loss to use
+    if luminosity_byproduct == 'log':
+        loss = keras.losses.logcosh
+    elif luminosity_byproduct == 'basic':
+        loss = keras.losses.msle
+    elif luminosity_byproduct == 'basicL':
+        loss = keras.losses.msle
+    elif luminosity_byproduct == 'numberCt':
+        loss = keras.losses.logcosh
+    else:
+        loss = keras.losses.mse
+
+    if make_model:
+        master = keras.Sequential()
+
+        ### convolutional layer
+        master.add(conv(base_filters, kernel_size=kernel, strides=strides, activation='relu', input_shape=input_shape,
+            padding='same', use_bias=False))
+        ### batch normalization
+        master.add(keras.layers.BatchNormalization())
+        ## dropout for training
+        master.add(keras.layers.Dropout(droprate))
+        ### use a convolution instead of a pool that acts like a pool
+        # master.add(conv(base_filters, kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=use_bias))
+        master.add(layers.AveragePooling3D(pool_size=pool, strides=pool, padding='same'))
+
+        ### loop through and add layers
+        for i in range(2, numb_layers+1):
+            ### convolutional layer
+            master.add(conv(base_filters*(2**(i-1)), kernel, activation='relu', padding='same', use_bias=use_bias))
+            ### batch normalization
+            master.add(keras.layers.BatchNormalization())
+            ## dropout for training
+            master.add(keras.layers.Dropout(droprate))
+            ### use a convolution instead of a pool that acts like a pool
+            # master.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=use_bias))
+            master.add(layers.AveragePooling3D(pool_size=pool, strides=pool, padding='same'))
+
+        ### flatten the network
+        master.add(keras.layers.Flatten())
+        ### make a dense layer for the second to last step
+        master.add(keras.layers.Dense(dense_layer, activation='relu', use_bias=use_bias))
+        ### dropout for training
+        master.add(keras.layers.Dropout(droprate))
+        ### finish it off with a dense layer with the number of output we want for our luminosity function
+        master.add(keras.layers.Dense(abs(lum_func_size), activation='linear'))
+
+        lr = 0.001
+        momentum = 0.7
+        decay_rate = lr/100
+
+        master.compile(loss=loss,
+                    optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
+                    metrics=[keras.metrics.mse])
+
+    if give_weights:
+        master.load_weights(weight_file_name)
+
+        master.compile(loss=loss,
+                       optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
+                       metrics=[keras.metrics.mse])
+
+    # print(weight_file_name)
+    master.summary()
+
+    return(master)
+
+##########################################################################
+### ANN ##################################################################
+##########################################################################
+def get_master_ann(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
+                extra_file_name='', file_name='full_lum_4_layer_model',
+                give_weights=False,
+                train_number=0,
+                droprate=0.2, numb_layers=4, base_filters=16,
+                luminosity_byproduct='log', use_bias=True):
+
+    ### get the weights file name
+    weight_file_name = modelLoc + file_name + extra_file_name + '_weights'
+    if train_number > 0:
+        weight_file_name += '_{0}'.format(int(train_number))
+    weight_file_name += '.hdf5'
+
+    ### set which convolution to use depending on if it is 3D or not and kernel sizes
+    make_model = True
+    # pool_size = 2
+    # if threeD:
+    #     conv = keras.layers.Conv3D
+    #     kernel = [kernel_size for i in range(3)]
+    #     pool = [pool_size for i in range(3)]
+    #     strides = [1 for i in range(3)]
+    #     input_shape = (pix_x, pix_y, numb_maps,1)
+    # else:
+    #     conv = keras.layers.Conv2D
+    #     kernel = [kernel_size for i in range(2)]
+    #     pool = [pool_size for i in range(2)]
+    #     strides = [1 for i in range(2)]
+    #     input_shape = (pix_x, pix_y, numb_maps)
+
+    ### choose which loss to use
+    if luminosity_byproduct == 'log':
+        loss = keras.losses.logcosh
+    elif luminosity_byproduct == 'basic':
+        loss = keras.losses.msle
+    elif luminosity_byproduct == 'basicL':
+        loss = keras.losses.msle
+    elif luminosity_byproduct == 'numberCt':
+        loss = keras.losses.logcosh
+    else:
+        loss = keras.losses.mse
+
+    image_tensor = layers.Input(shape=(pix_x, pix_y, numb_maps, 1))
+
+    x = layers.Flatten()(image_tensor)
+
+    x = layers.Dense(1000, activation='relu')(x)
+    x = layers.Dropout(droprate)(x)
+
+    x = layers.Dense(1000, activation='relu')(x)
+    x = layers.Dropout(droprate)(x)
+
+    x = layers.Dense(500, activation='relu')(x)
+    x = layers.Dropout(droprate)(x)
+
+    x = layers.Dense(100, activation='relu')(x)
+    x = layers.Dropout(droprate)(x)
+
+    x = layers.Dense(lum_func_size, activation='linear')(x)
+    network_output = layers.Dropout(droprate)(x)
+
+    master = models.Model(inputs=[image_tensor], outputs=[network_output])
+
+    lr = 0.001
+    momentum = 0.7
+    decay_rate = lr/100
+
+    master.compile(loss=loss,
+                optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
+                metrics=[keras.metrics.mse])
+
+    if give_weights:
+        master.load_weights(weight_file_name)
+
+        master.compile(loss=loss,
+                       optimizer=keras.optimizers.SGD(lr=lr, momentum=momentum, decay=decay_rate),
+                       metrics=[keras.metrics.mse])
+
+    master.summary()
+
+    return(master)
+
+##########################################################################
+### adam #################################################################
+##########################################################################
+def get_master_adam(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
+                extra_file_name='', file_name='full_lum_4_layer_model',
+                give_weights=False,
+                train_number=0,
+                droprate=0.2, numb_layers=4, base_filters=16, threeD=False,
+                luminosity_byproduct='log', kernel_size=3,
+                dense_layer=1000, use_bias=True):
+
+    ### get the weights file name
+    weight_file_name = modelLoc + file_name + extra_file_name + '_weights'
+    if train_number > 0:
+        weight_file_name += '_{0}'.format(int(train_number))
+    weight_file_name += '.hdf5'
+
+    ### set which convolution to use depending on if it is 3D or not and kernel sizes
+    make_model = True
+    pool_size = 2
+    if threeD:
+        conv = keras.layers.Conv3D
+        kernel = [kernel_size for i in range(3)]
+        kernel[-1] = 3
+        pool = [pool_size for i in range(3)]
+        strides = [1 for i in range(3)]
+        input_shape = (pix_x, pix_y, numb_maps,1)
+    else:
+        conv = keras.layers.Conv2D
+        kernel = [kernel_size for i in range(2)]
+        pool = [pool_size for i in range(2)]
+        strides = [1 for i in range(2)]
+        input_shape = (pix_x, pix_y, numb_maps)
+
+    ### choose which loss to use
+    if luminosity_byproduct == 'log':
+        loss = keras.losses.logcosh
+    elif luminosity_byproduct == 'basic':
+        loss = keras.losses.msle
+    elif luminosity_byproduct == 'basicL':
+        loss = keras.losses.msle
+    elif luminosity_byproduct == 'numberCt':
+        loss = keras.losses.logcosh
+    else:
+        loss = keras.losses.mse
+
+    if make_model:
+        master = keras.Sequential()
+
+        ### convolutional layer
+        master.add(conv(base_filters, kernel_size=kernel, strides=strides, activation='relu', input_shape=input_shape,
+            padding='same', use_bias=use_bias))
+        ### batch normalization
+        master.add(keras.layers.BatchNormalization())
+        ### dropout for training
+        master.add(keras.layers.Dropout(droprate))
+        ### use a convolution instead of a pool that acts like a pool
+        master.add(conv(base_filters, kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=use_bias))
+
+        ### convolutional layer
+        master.add(conv(base_filters*2, kernel, activation='relu', padding='same', use_bias=use_bias))
+        ### batch normalization
+        master.add(keras.layers.BatchNormalization())
+        ### dropout for training
+        master.add(keras.layers.Dropout(droprate))
+        ### use a convolution instead of a pool that acts like a pool
+        master.add(conv(base_filters*2, kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=use_bias))
+
+        ### loop through and add layers
+        for i in range(3, numb_layers+1):
+            ### convolutional layer
+            master.add(conv(base_filters*(2**(i-1)), kernel, activation='relu', padding='same', use_bias=True))
+            ### batch normalization
+            master.add(keras.layers.BatchNormalization())
+            ### dropout for training
+            master.add(keras.layers.Dropout(droprate))
+            ### use a convolution instead of a pool that acts like a pool
+            master.add(conv(base_filters*(2**(i-1)), kernel_size=pool, strides=pool, activation='relu', padding='same', use_bias=True))
+
+        ### flatten the network
+        master.add(keras.layers.Flatten())
+        ### make a dense layer for the second to last step
+        master.add(keras.layers.Dense(dense_layer, activation='relu', use_bias=True))
+        ### dropout for training
+        master.add(keras.layers.Dropout(droprate))
+        ### finish it off with a dense layer with the number of output we want for our luminosity function
+        master.add(keras.layers.Dense(lum_func_size, activation='linear'))
+
+        master.compile(loss=loss,
+                    optimizer=keras.optimizers.Adam(),
+                    metrics=[keras.metrics.mse])
+
+    if give_weights:
+        master.load_weights(weight_file_name)
+
+        master.compile(loss=loss,
+                       optimizer=keras.optimizers.SGD(),
                        metrics=[keras.metrics.mse])
 
     # print(weight_file_name)

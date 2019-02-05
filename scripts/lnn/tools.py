@@ -71,11 +71,12 @@ def convert_lum_to_log(lum, luminosity_product, lumLogBinCents):
 
 ### handle booleans for argument parsing
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ('no', 'false', 'f', 'n', '0', 'False'):
         return False
     else:
+        print(v)
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 ### make a file name from the given model information

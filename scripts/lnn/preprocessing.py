@@ -5,10 +5,12 @@ from skimage.measure import block_reduce
 
 from .ioFuncs import *
 
-### needed to save the map
+# needed to save the map
 from limlam_mocker import limlam_mocker as llm
 
-### function to convert a map file into a mapcube for the cnn
+# function to convert a map file into a mapcube for the cnn
+
+
 def fileToMapData(fName, log_input=False):
     mapData = loadData(fName)
     data = mapData['map_cube']
@@ -18,14 +20,18 @@ def fileToMapData(fName, log_input=False):
 
     return(data)
 
-### function to return the luminosity function from a lum files
+# function to return the luminosity function from a lum files
+
+
 def fileToLum(fName):
     lumData = loadData(fName)
     data = lumData
 
     return(data)
 
-### function to return the required luminosity function byproduct
+# function to return the required luminosity function byproduct
+
+
 def lumFuncByproduct(lumInfo, lumByproduct='basic'):
     if lumByproduct != 'category':
         lumResult = []
@@ -52,7 +58,9 @@ def lumFuncByproduct(lumInfo, lumByproduct='basic'):
     else:
         return(lumModelToInt(lumInfo))
 
-### functiont hat converts a luminosity model into an int for categorizing
+# functiont hat converts a luminosity model into an int for categorizing
+
+
 def lumModelToInt(lumInfo):
     model = lumInfo['model']
     model_int = -1
@@ -66,7 +74,9 @@ def lumModelToInt(lumInfo):
 
     return(model_int)
 
-### function to convert a basename into the map map_cube and the wanted luminosity byproduct
+# function to convert a basename into the map map_cube and the wanted luminosity byproduct
+
+
 def fileToMapAndLum(fName, lumByproduct='basic'):
     maps, lumInfo = loadMapAndLum(fName)
     mapData = maps['map_cube']
@@ -74,7 +84,9 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
 
     return(mapData, lumData)
 
-### function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
+# function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
+
+
 def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
                         make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
     lumByproduct = lumByproduct.decode("utf-8")
@@ -132,5 +144,20 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         # make sure to reshape the map data for the 3D convolutions
         mapData = mapData.reshape(len(mapData), len(
             mapData[0]), len(mapData[0][0]), 1)
+
+    return(mapData, lumData)
+
+# function to scale scale luminosities and the luminosity function
+# to get more test data
+def scaleMapAndLum(mapData, lumData, lumLogBinCents, bin_index_diff):
+    ratio = lumLogBinCents[0] / lumLogBinCents[0 + bin_index_diff]
+    mapData = mapData * ratio
+
+    lum_size = len(lumLogBinCents)
+    for i, lum in enumerate(lumData):
+        if i + bin_index_diff < lum_size:
+            lumData[i] = lumData[i + bin_index_diff]
+        else:
+            lumData[i] = 0
 
     return(mapData, lumData)

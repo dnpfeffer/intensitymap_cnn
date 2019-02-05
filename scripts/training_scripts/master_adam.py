@@ -69,6 +69,9 @@ droprate = 0.2
 # validation percent of data
 valPer = 0.2
 
+# number of maps to actually train on
+train_number = 0
+
 # number of layers
 numb_layers = 4
 
@@ -111,6 +114,7 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
 # add all of the arguments
 parser.add_argument('-fn', '--file_name', default='',
                     help='What file name to use')
@@ -145,7 +149,7 @@ parser.add_argument('-li', '--log_input', type=lnn.str2bool,
                     help='Take the log of the temperature map or not')
 parser.add_argument('-nm', '--make_map_noisy', type=float,
                     default=make_map_noisy,
-                    help='Number of filters to use in the first layer')
+                    help='Mean of the gaussian noise added to map in units of (micro K)')
 parser.add_argument('-ks', '--kernel_size', type=int,
                     default=kernel_size, help='Kernel size of convolution')
 parser.add_argument('-mal', '--map_loc', default=mapLoc,
@@ -165,6 +169,8 @@ parser.add_argument('-ub', '--use_bias', type=lnn.str2bool,
                     default=use_bias, help='Use the biases in the model')
 parser.add_argument('-ppz', '--pre_pool_z', type=int, default=pre_pool_z,
                     help='Kernel size for prepooling in z direction for maps')
+parser.add_argument('-tn', '--train_number', type=int, default=train_number,
+                    help='Number of maps to actually train on.  0 is default and does 1-val_percent of the data.')
 
 
 # read in values for all of the argumnets
@@ -189,6 +195,7 @@ dense_layer = args.dense_layer
 lum_func_size = args.lum_func_size
 use_bias = args.use_bias
 pre_pool_z = args.pre_pool_z
+train_number = args.train_number
 
 if fileName == '':
     fileName = lnn.make_file_name(
@@ -224,10 +231,10 @@ else:
         exit_str.format(numb_maps, pre_pool_z))
 
 
-# set up how much memory the gpus use
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 1.0
+# # set up how much memory the gpus use
+# config = tf.ConfigProto()
+# config.gpu_options.allow_growth = True
+# config.gpu_options.per_process_gpu_memory_fraction = 1.0
 
 # sess = tf.Session(config=config)
 # set_session(sess)
@@ -239,7 +246,7 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 if continue_training:
     continue_count = lnn.get_model_iteration(fileName, model_loc=modelLoc)
 
-    master = keras.models.load_model(modelLoc + fileName + '.hdf5')
+    model2 = keras.models.load_model(modelLoc + fileName + '.hdf5')
     make_model = False
     continue_name = '_{0}'.format(continue_count)
 else:
@@ -247,7 +254,8 @@ else:
 
 # choose which loss to use
 if luminosity_byproduct == 'log':
-    loss = keras.losses.logcosh
+    # loss = keras.losses.logcosh
+    loss = keras.losses.mse
 elif luminosity_byproduct == 'basic':
     loss = keras.losses.msle
 elif luminosity_byproduct == 'basicL':
@@ -256,7 +264,6 @@ elif luminosity_byproduct == 'numberCt':
     loss = keras.losses.logcosh
 else:
     loss = keras.losses.mse
-
 
 model2 = get_master_2(modelLoc, pix_x, pix_y, numb_maps, abs(lum_func_size),
                       train_number=0,
@@ -310,7 +317,8 @@ np.random.seed()
 valPoint = int(len(subFields) * (1 - valPer))
 base = [mapLoc + s for s in subFields[:valPoint]]
 
-base = base[:100]
+if train_number > 0:
+    base = base[:train_number]
 
 base_val = [mapLoc + s for s in subFields[valPoint:]]
 np.random.shuffle(base)
@@ -344,14 +352,9 @@ dataset_val = dataset_val.map(lambda item:
 dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
 
-lr = 0.01  # 0.001
-momentum = 0.0  # 0.7
-decay_rate = lr / 100
-
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
 multi_gpu_model2.compile(loss=loss,
-                         optimizer=keras.optimizers.SGD(
-                             lr=lr, momentum=momentum, decay=decay_rate),
+                         optimizer=keras.optimizers.Adam(),
                          metrics=[keras.metrics.mse])
 # multi_gpu_model2.summary()
 
