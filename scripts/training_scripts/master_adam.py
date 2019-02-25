@@ -334,9 +334,11 @@ dataset = dataset.map(lambda item:
                                         log_input, make_map_noisy,
                                         pre_pool,
                                         pre_pool_z, lum_func_size],
-                                       [tf.float64, tf.float64])))
+                                       [tf.float64, tf.float64])),
+                       num_parallel_calls=4)
 dataset = dataset.repeat()
 dataset = dataset.batch(batch_size)
+dataset = dataset.prefetch(batch_size)
 
 dataset_val = tf.data.Dataset.from_tensor_slices(
     tf.convert_to_tensor(base_val))
@@ -348,9 +350,11 @@ dataset_val = dataset_val.map(lambda item:
                                                 log_input, make_map_noisy,
                                                 pre_pool,
                                                 pre_pool_z, lum_func_size],
-                                               [tf.float64, tf.float64])))
+                                               [tf.float64, tf.float64])),
+                              num_parallel_calls=4)
 dataset_val = dataset_val.repeat()
 dataset_val = dataset_val.batch(batch_size)
+dataset_val = dataset_val.prefetch(batch_size)
 
 multi_gpu_model2 = keras.utils.multi_gpu_model(model2, numb_gpu)
 multi_gpu_model2.compile(loss=loss,

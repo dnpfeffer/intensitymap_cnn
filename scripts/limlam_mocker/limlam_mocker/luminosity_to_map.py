@@ -40,7 +40,7 @@ def Lco_to_map(halos,map, **kw):
     ### add white noise if it is requested
     if 'noise' in kw:
         if kw['noise'] > 0:
-            maps = maps + np.absolute(np.random.normal(0, kw['noise'], maps.shape))
+            maps = maps + np.maximum(np.random.normal(0, kw['noise'], maps.shape), 0)
 
     # flip back frequency bins
     return maps[:,:,::-1]

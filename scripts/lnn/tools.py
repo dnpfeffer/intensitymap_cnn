@@ -26,7 +26,7 @@ def get_model_iteration(model_name, model_matches=[], model_loc=[]):
     ### get the number of models with that name with completed histories
     ct = 0
     for m in model_matches:
-        if model_name + '_history' in m:
+        if model_name + '_history' in m and m[:len(model_name)] == model_name:
             ct += 1
 
     ### return the count
@@ -106,7 +106,8 @@ def make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters):
 ###############################################################
 
 ### plots the history of training a model and compares two metrics at the same time
-def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'], start_loc=1):
+def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'], start_loc=1,
+    do_val=True):
     ### set up plot
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
@@ -126,7 +127,8 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 
         ### actual plotting on each axis
         ax.semilogy(range(len(history[key]))[start_loc:], history[key][start_loc:], label=key, color=color)
-        ax.semilogy(range(len(history['val_' + key]))[start_loc:], history['val_' + key][start_loc:], color=color, ls='--')
+        if do_val:
+            ax.semilogy(range(len(history['val_' + key]))[start_loc:], history['val_' + key][start_loc:], color=color, ls='--')
         ax.set_ylabel(key, color=color)
         ax.tick_params('y', which='both', labelcolor=color)
 
@@ -147,14 +149,14 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
                 evaluate=True, log_input=False, make_map_noisy=0,
                 pre_pool=1, pre_pool_z=25, lum_func_size=None):
     # ### get the simulated map and luminosity byproduct
-    # cur_map = fileToMapData(base[base_number] + '_map.npz', log_input=log_input)
-    # cur_lum = lumFuncByproduct(fileToLum(base[base_number] + '_lum.npz'), luminosity_byproduct)
-
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
 
     ### add gaussian noise, but make sure it is positive valued
     if make_map_noisy > 0:
-        cur_map = cur_map + np.absolute(np.random.normal(0, make_map_noisy, cur_map.shape))
+        cur_map = cur_map + np.maximum(np.random.normal(0, make_map_noisy, cur_map.shape), 0)
+
+    # cur_map = np.zeros(cur_map.shape)
+    # cur_lum = np.zeros(cur_lum.shape)
 
     if pre_pool > 1:
         if len(cur_map)%pre_pool == 0:
@@ -188,16 +190,22 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
     ### make a prediction for the luminoisty byproduct for the given map
     cnn_lum = model.predict(tf.convert_to_tensor(base_map), steps=1)
 
+    ### convert negative values to just 0
+    cnn_lum[cnn_lum < 0] = 0
+
     # print(cnn_lum)
     # print('testing')
 
     ### return loss and other metric data about the CNN's output
     if evaluate:
         print('Error and MSE for the given base_number:')
-        print(model.evaluate(tf.convert_to_tensor(base_map), tf.convert_to_tensor(base_lum), steps=1, verbose=0))
+        loss = model.evaluate(tf.convert_to_tensor(base_map), tf.convert_to_tensor(base_lum), steps=1, verbose=0)
+        print(loss)
+    else:
+        loss = [0,0]
 
     ### return the simulated luminosity byproduct and the one from the CNN
-    return(cur_lum, cnn_lum)
+    return(cur_lum, cnn_lum, loss)
 
 ### test a single model against multiple maps
 def test_model_multiple_times(model, base, luminosity_byproduct='log',
@@ -210,8 +218,15 @@ def test_model_multiple_times(model, base, luminosity_byproduct='log',
     if len(base_numbers) > 0:
         base = base[base_numbers]
 
-    if len(base) < test_size:
-        test_size = len(base)
+    if len(base) < batch_size:
+        batch_size = len(base)
+        test_size = 1
+    elif len(base) < test_size * batch_size:
+        ratio = len(base)/batch_size
+        if ratio / int(ratio) == 1:
+            test_size = int(ratio)
+        else:
+            test_size = int(ratio) + 1
 
     dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
     dataset = dataset.shuffle(buffer_size=len(base))
@@ -271,15 +286,15 @@ def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label, lum_func_size=Non
 ### plot the ratio of a CNN's result to the underlying simulation
 def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1):
     ### get moving average of CNN result to make it look smoother
-    window_size = 5
-    window = np.ones(window_size)/float(window_size)
-    avg = np.convolve(cnn_lum[0], window, 'same')
+    # window_size = 5
+    # window = np.ones(window_size)/float(window_size)
+    # avg = np.convolve(cnn_lum[0], window, 'same')
 
     ### plot the ratio
     ratio = cnn_lum[0]/cur_lum
-    ratio_smooth = avg/cur_lum
+    # ratio_smooth = avg/cur_lum
     plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label='CNN')
-    plt.semilogx(lumLogBinCents[2:-(end_cut_off)], ratio_smooth[2:-(end_cut_off)], label='Smoothed CNN')
+    # plt.semilogx(lumLogBinCents[2:-(end_cut_off)], ratio_smooth[2:-(end_cut_off)], label='Smoothed CNN')
 
     ### handle the title correclty based on the byproduct used
     if title == 'basic':
@@ -295,7 +310,7 @@ def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1):
         plt.title('Using dN/dL')
 
     # plt.ylim([.5, 1.5])
-    plt.ylim([0.9, 1.1])
+    plt.ylim([0.8, 1.2])
 
     plt.ylabel('Predicted / Expected')
     plt.xlabel('L (L_sun)')
