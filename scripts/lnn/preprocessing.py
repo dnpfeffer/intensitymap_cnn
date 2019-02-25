@@ -127,6 +127,7 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         mapData = np.log10(mapData + 1e-6)
 
         mapData -= (np.min(mapData))
+        # cur_map -= (-6)
 
     # mean_map = np.mean(mapData)
     # std_map = np.std(mapData)

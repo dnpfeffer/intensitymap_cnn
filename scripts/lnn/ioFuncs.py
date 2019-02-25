@@ -162,8 +162,6 @@ def get_model_name_matches(modelLoc, model_name):
     return(model_matches)
 
 # function to load up the history of a model
-
-
 def load_history(history_path):
     with open(history_path, 'rb') as pickle_file:
         history = pickle.load(pickle_file)
