@@ -168,7 +168,6 @@ def load_history(history_path):
         history = pickle.load(pickle_file)
     return(history)
 
-
 # function to return the required luminosity function byproduct
 def lumFuncByproduct(lumInfo, lumByproduct='basic'):
     if lumByproduct != 'category':

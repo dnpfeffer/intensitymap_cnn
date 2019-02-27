@@ -179,7 +179,7 @@ class ModelParams:
 
     def clean_parser_data(self):
         if self.fileName == '':
-            self.fileName = lnn.make_file_name(
+            self.fileName = make_file_name(
                 self.luminosity_byproduct, self.numb_layers, self.ThreeD, self.base_filters)
 
         # if there is a non-one pre_pool value, change the pix_x and pix_x accordingly
@@ -251,6 +251,27 @@ class ModelParams:
             loss = losses.mse
 
         self.loss = loss
+
+# make a file name from the given model information
+def make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters):
+    if luminosity_byproduct == 'log':
+        lb_string = 'log'
+    elif luminosity_byproduct == 'basic':
+        lb_string = 'full'
+    elif luminosity_byproduct == 'basicL':
+        lb_string = 'fullL'
+    else:
+        print('There should not be a way for someone to be in make_file_name without a valid luminosity_byproduct: {0}'.format(luminosity_byproduct))
+        exit(0)
+
+    if ThreeD:
+        ThreeD_string = '3D'
+    else:
+        ThreeD_string = '2D'
+
+    file_name = '{0}_lum_{1}_layer_{2}_{3}_filters_model'.format(lb_string, numb_layers, ThreeD_string, base_filters)
+
+    return(file_name)
 
 def setup_checkpoints(model_params, callbacks):
     filePath = model_params.modelLoc + model_params.fileName + '_temp' + model_params.continue_name + '.hdf5'
