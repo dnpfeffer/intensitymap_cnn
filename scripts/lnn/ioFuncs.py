@@ -168,6 +168,49 @@ def load_history(history_path):
         history = pickle.load(pickle_file)
     return(history)
 
+# gets the number of times a model has been trained
+def get_model_iteration(model_name, model_matches=[], model_loc=[]):
+    # handle the possible inputs
+    # can be given a list of names or the directory with the model files
+    if len(model_matches) > 0 and len(model_loc) > 0:
+        print('Given both a modelLoc and model match.  Defaulting to model match')
+    elif len(model_loc) > 0 and len(model_matches) == 0:
+        model_matches = get_model_name_matches(model_loc, model_name)
+
+    # yell at the user if there was no real models with that name
+    if len(model_matches) == 0 and len(model_loc) == 0:
+        print('Either no model locations or model matches were given or there was not a completed run with the given model name')
+        return(0)
+
+    # get the number of models with that name with completed histories
+    ct = 0
+    for m in model_matches:
+        if model_name + '_history' in m:
+            ct += 1
+
+    ### return the count
+    return(ct)
+
+# gets the total history of a model
+def get_full_history(model_name, model_loc):
+    # get the nubmer of times the model has been trained
+    train_count = get_model_iteration(model_name, model_loc=model_loc)
+
+    # load up the first trianing history
+    history_name = model_loc + model_name + '_history'
+    base_history = load_history(history_name)
+
+    # return the history if it was only trained once
+    if train_count == 1:
+        return(base_history)
+
+    # combine histories if the model was trained multiple times
+    for i in range(1, train_count):
+        new_history = load_history('{0}_{1}'.format(history_name, i))
+        for key in base_history:
+            base_history[key] = base_history[key] + new_history[key]
+
+    return(base_history)
 
 # function to return the required luminosity function byproduct
 def lumFuncByproduct(lumInfo, lumByproduct='basic'):
