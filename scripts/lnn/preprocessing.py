@@ -402,6 +402,7 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
     if log_input:
         mapData = np.log10(mapData + 1e-6)
         mapData -= (-6)
+        # mapData -= (np.min(mapData))
 
     # mean_map = np.mean(mapData)
     # std_map = np.std(mapData)
@@ -604,3 +605,4 @@ def binedge_to_binctr(binedge):
 def add_to_processed_map(old_map, new_map):
     old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
     return(old_map)
+
