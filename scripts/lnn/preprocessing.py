@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+# import astropy.units as u
+import sys
 import time
 
 from skimage.measure import block_reduce
@@ -24,6 +26,8 @@ class ModelParams:
         self.numb_maps = 100
         self.pix_x = 256
         self.pix_y = 256
+        self.omega_pix = 0
+        self.nu = []
 
         # luminosity function number of x-values
         self.lum_func_size = 49
@@ -79,6 +83,7 @@ class ModelParams:
         self.log_input = True
         self.make_map_noisy = 0
         self.random_augmentation = False
+        self.insert_foreground = False
 
     def setup_parser(self, parser):
         # add all of the arguments
@@ -139,6 +144,8 @@ class ModelParams:
                             help='Number of maps to actually train on.  0 is default and does 1-val_percent of the data.')
         parser.add_argument('-ra', '--random_augmentation', type=self.str2bool,
                             default=self.random_augmentation, help='Train with random augmentations or not')
+        parser.add_argument('-if', '--insert_foreground', type=self.str2bool,
+                            default=self.insert_foreground, help='Train with foregrounds or not')
 
     def read_parser(self, parser):
         # read in values for all of the argumnets
@@ -168,6 +175,7 @@ class ModelParams:
         self.catLoc = '../../{0}/'.format(args.cat_loc)
         self.modelLoc = '../../{0}/'.format(args.model_loc)
         self.random_augmentation = args.random_augmentation
+        self.insert_foreground = args.insert_foreground
 
     def clean_parser_data(self):
         if self.fileName == '':
@@ -198,6 +206,14 @@ class ModelParams:
                 'by the pre-pooling-z size ({1})'
             sys.exit(
                 exit_str.format(self.numb_maps, self.pre_pool_z))
+
+    def get_map_info(self, fName):
+        # load mapa data
+        data = loadMap_data(fName)
+
+        # set map data into the data structure
+        self.omega_pix = data['omega_pix'] * self.pre_pool**2
+        self.nu = data['nu']
 
     def str2bool(self, v):
         if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -282,6 +298,8 @@ def setup_datasets(model_params):
     np.random.shuffle(base)
     np.random.shuffle(base_val)
 
+    model_params.get_map_info(base[0] + '_map.npz')
+
     dataset = make_dateset(model_params, base)
 
     if model_params.train_number < len(base_val) and model_params.train_number > 0:
@@ -320,7 +338,21 @@ def make_dateset(model_params, base):
                                                                 lumLogBinCents],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
-    # this adds gaussian noise to pre-processed maps so that doesn't mean anything
+
+    # add in foregrounds if requested
+    if model_params.insert_foreground == True:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(add_foreground_noise, [x,
+                                                                y,
+                                                                model_params.pix_x,
+                                                                model_params.pix_y,
+                                                                model_params.omega_pix,
+                                                                model_params.nu,
+                                                                model_params.pre_pool_z],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
+
+    # this adds gaussian noise to pre-processed maps
     if model_params.make_map_noisy > 0:
         dataset = dataset.map(lambda x, y:
                             tuple(tf.py_func(add_noise_after_pool, [x,
@@ -330,6 +362,7 @@ def make_dateset(model_params, base):
                                                                 y],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
+
     dataset = dataset.repeat()
     dataset = dataset.batch(model_params.batch_size)
     dataset = dataset.prefetch(2)
@@ -346,37 +379,13 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
 
 # function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
 def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
-                        make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
+    make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
 
     if type(lumByproduct) is not str:
         lumByproduct = lumByproduct.decode("utf-8")
     if type(fName) is not str:
         fName = fName.decode("utf-8")
     mapData, lumData = fileToMapAndLum(fName, lumByproduct)
-
-    # print(fName)
-    # print(mapData)
-    # print(lumData)
-
-    #########################
-    # very temp thing that needs to be done correctly later
-    # make some maps have only zeros and the lum func be zero as well
-    # randomly scale things that aren't zero
-    ########################
-    # if np.random.rand() < 0.1:
-    #     mapData = np.zeros(mapData.shape)
-    #     lumData = np.zeros(lumData.shape)
-    #     # pass
-    # else:
-    #     lumLogBinCents = loadLogBinCenters(fName.decode('utf-8'))
-    #     # bin_index_diff = np.random.randint(0, len(lumLogBinCents)-1)
-    #     bin_index_diff = int(np.random.poisson(5))
-    #     mapData, lumData = scaleMapAndLum(
-    #         mapData, lumData, lumLogBinCents, bin_index_diff)
-    #     # pass
-    ########################
-    #######################
-
 
     # add gaussian noise, but make sure it is positive valued
     # if make_map_noisy > 0:
@@ -392,8 +401,6 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
 
     if log_input:
         mapData = np.log10(mapData + 1e-6)
-
-        # mapData -= (np.min(mapData))
         mapData -= (-6)
 
     # mean_map = np.mean(mapData)
@@ -429,7 +436,7 @@ def add_noise_after_pool(mapData, make_maep_noisy, pre_pool, pre_pool_z, luminos
         noise = np.maximum(np.random.normal(new_mean, new_std, mapData.shape), 0)
 
         # add the noise to the map correctly
-        mapData = np.log10(np.power(10, mapData-6) + noise) + 6
+        mapData = add_to_processed_map(mapData, noise)
 
     return(mapData, luminosity)
 
@@ -484,4 +491,116 @@ def scaleMapAndLum(mapData, lumData, lumLogBinCents, bin_index_diff=-1):
 
     return(mapData, lumData)
 
+# function to add foreground noise into an intensity map
+def add_foreground_noise(mapData, lumData, Nx, Ny, Omega_pix, nu, pre_pool_z):
+    foreground = makeFGcube(int(Nx), int(Ny), Omega_pix, nu)
 
+    foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
+    foreground = foreground.reshape(len(foreground), len(
+            foreground[0]), len(foreground[0][0]), 1)
+
+    mapData = add_to_processed_map(mapData, foreground)
+
+    return(mapData, lumData)
+
+# make foreground data cube
+def makeFGcube(Nx,Ny,Omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39,sigma_a=0.33):
+    '''
+    Function which generates intensity cube from point-source foregrounds based
+    on observations in arXiv 0912.2335
+
+    INPUTS:
+    Nx          Number of map pixels in the x direction
+    Ny          Number of map pixels in the y direction
+    Omega_pix   Solid angle subtended by a single pixel
+    nu          List of centers of frequency channels
+    N0          Number of sources/deg^2 (fid: 32.1 +/- 3 deg^-2)
+    gamma       Slope of source flux power law (fid: 2.18 +/- 0.12)
+    Smin        Minimum 31 GHz flux (fid: 1 u.mJy)
+    Smax        Maximum 31 GHz flux (fid: 10^2.5 u.mJy)
+    a0          Mean spectral index (fid: 0.39)
+    sigma_a     Variance of Gaussian spectral index dist. (fid: 0.33)
+    '''
+
+    # Mean sources/pixel
+    Nbar = N0*Omega_pix
+
+    # Array of source counts
+    Nsrc = np.random.poisson(Nbar,(Nx,Ny))
+
+    # 31GHz Flux PDF
+    S0 = 1
+    Sedge = ulogspace(Smin,Smax,1001)
+    Sbin = binedge_to_binctr(Sedge)
+    dS = np.diff(Sedge)
+
+    dNdS = N0*(Sbin/S0)**-gamma
+    PS = dNdS*dS/(dNdS*dS).sum()
+
+    # Initialize foreground data cube
+    TFG = np.zeros((Nx,Ny,nu.size))
+
+    amounts = np.random.poisson(Nbar,Nx*Ny)
+    sources = amounts[np.flatnonzero(amounts)]
+    choices = [(x,y) for x in range(Nx) for y in range(Ny)]
+    locs = np.random.permutation(choices)[:len(sources)]
+
+    for source, loc in zip(sources, locs):
+        alpha = np.random.normal(a0,sigma_a,source)
+        S = np.random.choice(Sbin,size=source,p=PS)
+        ii = loc[0]
+        jj = loc[1]
+        for nn in range(0,source):
+                TFG[ii,jj,:] = TFG[ii,jj,:]+Tnu(S[nn],nu,alpha[nn],Omega_pix)
+
+    return(TFG)
+
+# compute brightness temp for foregrounds
+def Tnu(S31,nu,alpha,Omega_pix):
+    '''
+    Computes brightness temperature as a function of frequency given a
+    spectral index and an intensity at 31 GHz
+    '''
+    S = S31*(nu/(31))**-alpha
+
+    c = 2.99792458*10**8
+    kb = 1.38064852*10**-16
+    sq_deg_to_str = (np.pi/180)**2
+    Jy_to_erg_m2 = 10**-19
+
+    conversion = 1/1000*Jy_to_erg_m2/(Omega_pix*sq_deg_to_str) * c**2/(2 * kb * (nu.mean()*10**9)**2)*10**6
+
+    return(S*conversion)
+
+# compute logarithmically-spaced numpy array with linear xmin and xmax
+def ulogspace(xmin,xmax,nx):
+    '''
+    Computes logarithmically-spaced numpy array between xmin and xmax with nx
+    points.  This function calls the usual np.loglog but takes the linear
+    values of xmin and xmax (where np.loglog requires the log of those limits)
+    and allows the limits to have astropy units.  The output array will be a
+    quantity with the same units as xmin and xmax
+    '''
+
+    return(np.logspace(np.log10(xmin),np.log10(xmax),nx))
+
+# output centers of bins given their edges
+def binedge_to_binctr(binedge):
+    '''
+    Outputs centers of histogram bins given their edges
+
+    >>> Tedge = [1.,2.]*u.uK
+    >>> print binedge_to_binctr(Tedge)
+    [ 1.5] uK
+    '''
+
+    Nedge = binedge.size
+
+    binctr = (binedge[0:Nedge-1]+binedge[1:Nedge])/2.
+
+    return(binctr)
+
+# function to add a map to a post-processed map
+def add_to_processed_map(old_map, new_map):
+    old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
+    return(old_map)
