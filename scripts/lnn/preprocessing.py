@@ -7,7 +7,7 @@ import time
 from skimage.measure import block_reduce
 
 from .ioFuncs import *
-from .tools import *
+# from .tools import *
 
 # needed to save the map
 from limlam_mocker import limlam_mocker as llm
@@ -176,6 +176,10 @@ class ModelParams:
         self.modelLoc = '../../{0}/'.format(args.model_loc)
         self.random_augmentation = args.random_augmentation
         self.insert_foreground = args.insert_foreground
+
+    def give_attributes(self, **kwargs):
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
     def clean_parser_data(self):
         if self.fileName == '':
@@ -363,7 +367,7 @@ def make_dateset(model_params, base):
     # add in foregrounds if requested
     if model_params.insert_foreground == True:
         dataset = dataset.map(lambda x, y:
-                            tuple(tf.py_func(add_foreground_noise, [x,
+                            tuple(tf.py_func(add_foreground_noise_lum_wrapper, [x,
                                                                 y,
                                                                 model_params.pix_x,
                                                                 model_params.pix_y,
@@ -376,11 +380,11 @@ def make_dateset(model_params, base):
     # this adds gaussian noise to pre-processed maps
     if model_params.make_map_noisy > 0:
         dataset = dataset.map(lambda x, y:
-                            tuple(tf.py_func(add_noise_after_pool, [x,
+                            tuple(tf.py_func(add_noise_after_pool_lum_wrapper, [x,
+                                                                y,
                                                                 model_params.make_map_noisy,
                                                                 model_params.pre_pool,
-                                                                model_params.pre_pool_z,
-                                                                y],
+                                                                model_params.pre_pool_z],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
@@ -445,7 +449,7 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
     return(mapData, lumData)
 
 # function to add noise to a map after it has already been pooled
-def add_noise_after_pool(mapData, make_maep_noisy, pre_pool, pre_pool_z, luminosity=None):
+def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z):
 
     # only add noise 90% of the time
     if np.random.rand() < 0.9:
@@ -453,12 +457,19 @@ def add_noise_after_pool(mapData, make_maep_noisy, pre_pool, pre_pool_z, luminos
 
         # Use central limit theorem and get a single draw for the noise
         # assume 160 draws is enough and my math is correct to get new mean and variance
-        new_mean = shrink_size / np.sqrt(2*np.pi) * make_maep_noisy
-        new_std = np.sqrt(shrink_size / 2 * make_maep_noisy**2 * (1 - 1/np.pi))
+        new_mean = shrink_size / np.sqrt(2*np.pi) * make_map_noisy
+        new_std = np.sqrt(shrink_size / 2 * make_map_noisy**2 * (1 - 1/np.pi))
         noise = np.maximum(np.random.normal(new_mean, new_std, mapData.shape), 0)
 
         # add the noise to the map correctly
         mapData = add_to_processed_map(mapData, noise)
+
+    return(mapData)
+
+# function to add noise to a map after it has already been pooled
+# wraps around function that doesn't take the luminosity data
+def add_noise_after_pool_lum_wrapper(mapData, luminosity, make_map_noisy, pre_pool, pre_pool_z):
+    mapData = add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z)
 
     return(mapData, luminosity)
 
@@ -514,19 +525,25 @@ def scaleMapAndLum(mapData, lumData, lumLogBinCents, bin_index_diff=-1):
     return(mapData, lumData)
 
 # function to add foreground noise into an intensity map
-def add_foreground_noise(mapData, lumData, Nx, Ny, Omega_pix, nu, pre_pool_z):
+def add_foreground_noise(mapData, Nx, Ny, Omega_pix, nu, pre_pool_z):
     foreground = makeFGcube(int(Nx), int(Ny), Omega_pix, nu)
 
     foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
-    foreground = foreground.reshape(len(foreground), len(
-            foreground[0]), len(foreground[0][0]), 1)
+    foreground = foreground.reshape(mapData.shape)
 
     mapData = add_to_processed_map(mapData, foreground)
+
+    return(mapData)
+
+# function to add foreground noise into an intensity map
+# wraps around function that doesn't take the luminosity data
+def add_foreground_noise_lum_wrapper(mapData, lumData, Nx, Ny, omega_pix, nu, pre_pool_z):
+    mapData = add_foreground_noise(mapData, Nx, Ny, Omega_pix, nu, pre_pool_z)
 
     return(mapData, lumData)
 
 # make foreground data cube
-def makeFGcube(Nx,Ny,Omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39,sigma_a=0.33):
+def makeFGcube(Nx,Ny,omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39,sigma_a=0.33):
     '''
     Function which generates intensity cube from point-source foregrounds based
     on observations in arXiv 0912.2335
@@ -534,7 +551,7 @@ def makeFGcube(Nx,Ny,Omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39
     INPUTS:
     Nx          Number of map pixels in the x direction
     Ny          Number of map pixels in the y direction
-    Omega_pix   Solid angle subtended by a single pixel
+    omega_pix   Solid angle subtended by a single pixel
     nu          List of centers of frequency channels
     N0          Number of sources/deg^2 (fid: 32.1 +/- 3 deg^-2)
     gamma       Slope of source flux power law (fid: 2.18 +/- 0.12)
@@ -545,7 +562,7 @@ def makeFGcube(Nx,Ny,Omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39
     '''
 
     # Mean sources/pixel
-    Nbar = N0*Omega_pix
+    Nbar = N0*omega_pix
 
     # Array of source counts
     Nsrc = np.random.poisson(Nbar,(Nx,Ny))
@@ -573,12 +590,12 @@ def makeFGcube(Nx,Ny,Omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39
         ii = loc[0]
         jj = loc[1]
         for nn in range(0,source):
-                TFG[ii,jj,:] = TFG[ii,jj,:]+Tnu(S[nn],nu,alpha[nn],Omega_pix)
+                TFG[ii,jj,:] = TFG[ii,jj,:]+Tnu(S[nn],nu,alpha[nn],omega_pix)
 
     return(TFG)
 
 # compute brightness temp for foregrounds
-def Tnu(S31,nu,alpha,Omega_pix):
+def Tnu(S31,nu,alpha,omega_pix):
     '''
     Computes brightness temperature as a function of frequency given a
     spectral index and an intensity at 31 GHz
@@ -590,7 +607,7 @@ def Tnu(S31,nu,alpha,Omega_pix):
     sq_deg_to_str = (np.pi/180)**2
     Jy_to_erg_m2 = 10**-19
 
-    conversion = 1/1000*Jy_to_erg_m2/(Omega_pix*sq_deg_to_str) * c**2/(2 * kb * (nu.mean()*10**9)**2)*10**6
+    conversion = 1/1000*Jy_to_erg_m2/(omega_pix*sq_deg_to_str) * c**2/(2 * kb * (nu.mean()*10**9)**2)*10**6
 
     return(S*conversion)
 
@@ -626,4 +643,3 @@ def binedge_to_binctr(binedge):
 def add_to_processed_map(old_map, new_map):
     old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
     return(old_map)
-

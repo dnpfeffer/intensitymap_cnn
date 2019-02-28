@@ -9,98 +9,6 @@ from .preprocessing import *
 import tensorflow as tf
 from tensorflow import keras as k
 
-# ### gets the number of times a model has been trained
-# def get_model_iteration(model_name, model_matches=[], model_loc=[]):
-#     ### handle the possible inputs
-#     ### can be given a list of names or the directory with the model files
-#     if len(model_matches) > 0 and len(model_loc) > 0:
-#         print('Given both a modelLoc and model match.  Defaulting to model match')
-#     elif len(model_loc) > 0 and len(model_matches) == 0:
-#         model_matches = get_model_name_matches(model_loc, model_name)
-
-#     ### yell at the user if there was no real models with that name
-#     if len(model_matches) == 0 and len(model_loc) == 0:
-#         print('Either no model locations or model matches were given or there was not a completed run with the given model name')
-#         return(0)
-
-#     ### get the number of models with that name with completed histories
-#     ct = 0
-#     for m in model_matches:
-#         if model_name + '_history' in m:
-#             ct += 1
-
-#     ### return the count
-#     return(ct)
-
-# ### gets the total history of a model
-# def get_full_history(model_name, model_loc):
-#     ### get the nubmer of times the model has been trained
-#     train_count = get_model_iteration(model_name, model_loc=model_loc)
-
-#     ### load up the first trianing history
-#     history_name = model_loc + model_name + '_history'
-#     base_history = load_history(history_name)
-
-#     ### return the history if it was only trained once
-#     if train_count == 1:
-#         return(base_history)
-
-#     ### combine histories if the model was trained multiple times
-#     for i in range(1, train_count):
-#         new_history = load_history('{0}_{1}'.format(history_name, i))
-#         for key in base_history:
-#             base_history[key] = base_history[key] + new_history[key]
-
-#     return(base_history)
-
-### convert a luminosity byproduct into log luminosity byproduct
-def convert_lum_to_log(lum, luminosity_product, lumLogBinCents):
-    ### don't worry if it is already log
-    if luminosity_product == 'log':
-        pass
-    ### take the log if it is \phi
-    elif luminosity_product == 'basic':
-        lum = np.log10(lum)
-    ### divide by the luminosity and take the log if it is \phi*L
-    elif luminosity_product == 'basicL':
-        lum = np.log10(lum/lumLogBinCents)
-    else:
-        print('You shouldn\'t be here...')
-
-    return(lum)
-
-# ### handle booleans for argument parsing
-# def str2bool(v):
-#     if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
-#         return True
-#     elif v.lower() in ('no', 'false', 'f', 'n', '0', 'False'):
-#         return False
-#     else:
-#         print(v)
-#         raise argparse.ArgumentTypeError('Boolean value expected.')
-
-### make a file name from the given model information
-# def make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters):
-#     if luminosity_byproduct == 'log':
-#         lb_string = 'log'
-#     elif luminosity_byproduct == 'basic':
-#         lb_string = 'full'
-#     elif luminosity_byproduct == 'basicL':
-#         lb_string = 'fullL'
-#     else:
-#         print('There should not be a way for someone to be in make_file_name without a valid luminosity_byproduct: {0}'.format(luminosity_byproduct))
-#         exit(0)
-
-#     if ThreeD:
-#         ThreeD_string = '3D'
-#     else:
-#         ThreeD_string = '2D'
-
-#     file_name = '{0}_lum_{1}_layer_{2}_{3}_filters_model'.format(lb_string, numb_layers, ThreeD_string, base_filters)
-
-#     return(file_name)
-
-
 ###############################################################
 ### Jupyter Notebook Plotting Tools ###########################
 ###############################################################
@@ -145,48 +53,75 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 ### get the predicted and simulated luminosity function byproduct for a given model and map
 def test_model(model, base, base_number, luminosity_byproduct='log', threeD=False,
                 evaluate=True, log_input=False, make_map_noisy=0,
-                pre_pool=1):
-    ### get the simulated map and luminosity byproduct
-    # cur_map = fileToMapData(base[base_number] + '_map.npz', log_input=log_input)
-    # cur_lum = lumFuncByproduct(fileToLum(base[base_number] + '_lum.npz'), luminosity_byproduct)
-
+                pre_pool=1, pre_pool_z=25, lum_func_size=None,
+                add_foregrounds=False):
+    # ### get the simulated map and luminosity byproduct
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
 
-    ### add gaussian noise, but make sure it is positive valued
-    if make_map_noisy > 0:
-        cur_map = cur_map + np.absolute(np.random.normal(0, make_map_noisy, cur_map.shape))
+    # cur_map = np.zeros(cur_map.shape)
+    # cur_lum = np.zeros(cur_lum.shape)
 
     if pre_pool > 1:
         if len(cur_map)%pre_pool == 0:
-            cur_map = block_reduce(cur_map, (pre_pool, pre_pool, 25), np.sum)
+            cur_map = block_reduce(cur_map, (pre_pool, pre_pool, pre_pool_z), np.sum)
         else:
+            # I feel like I put this here for a reason...
             pass
 
     if log_input:
         cur_map = np.log10(cur_map + 1e-6)
-        cur_map -= (np.min(cur_map))
+        # cur_map -= (np.min(cur_map))
+        cur_map -= (-6)
+
+    ### add gaussian noise
+    if make_map_noisy > 0:
+        cur_map = add_noise_after_pool(cur_map, make_map_noisy, pre_pool, pre_pool_z)
+
+    # this is very janky and should be fixed
+    if add_foregrounds:
+        model_params = ModelParams()
+        model_params.give_attributes(pre_pool=4, pre_pool_z=10)
+        model_params.clean_parser_data()
+        model_params.get_map_info(base[base_number] + '_map.npz')
+
+        cur_map = add_foreground_noise(cur_map, model_params.pix_x, model_params.pix_y, model_params.omega_pix,
+                                model_params.nu, pre_pool_z)
+
+    if lum_func_size is not None:
+        if lum_func_size >= 1:
+            # lumData = lumData[::lum_func_size]
+            cur_lum = cur_lum[:lum_func_size]
+        else:
+            cur_lum = cur_lum[lum_func_size:]
+
+    # cur_map = np.zeros(cur_map.shape)
+    # cur_lum = np.zeros(cur_lum.shape)
 
     ### Handle 3D maps correctly
     if threeD:
         cur_map = cur_map.reshape(len(cur_map), len(cur_map[0]), len(cur_map[0][0]), 1)
 
-    ### expand teh dimensions of the map and luminosity byproduct to work with the tensor of the model
+    ### expand the dimensions of the map and luminosity byproduct to work with the tensor of the model
     base_map = np.expand_dims(cur_map, axis=0)
     base_lum = np.expand_dims(cur_lum, axis=0)
 
     ### make a prediction for the luminoisty byproduct for the given map
     cnn_lum = model.predict(tf.convert_to_tensor(base_map), steps=1)
 
-    # print(cnn_lum)
-    # print('testing')
+    ### convert negative values to just 0
+    cnn_lum[cnn_lum < 0] = 0
+
 
     ### return loss and other metric data about the CNN's output
     if evaluate:
         print('Error and MSE for the given base_number:')
-        print(model.evaluate(tf.convert_to_tensor(base_map), tf.convert_to_tensor(base_lum), steps=1, verbose=0))
+        loss = model.evaluate(tf.convert_to_tensor(base_map), tf.convert_to_tensor(base_lum), steps=1, verbose=0)
+        print(loss)
+    else:
+        loss = [0,0]
 
     ### return the simulated luminosity byproduct and the one from the CNN
-    return(cur_lum, cnn_lum)
+    return(cur_lum, cnn_lum, loss)
 
 ### test a single model against multiple maps
 def test_model_multiple_times(model, base, luminosity_byproduct='log',
@@ -455,6 +390,22 @@ def convert_lum_to_numberCt(lum, luminosity_product, lumLogBinCents):
     ### do nothing
     elif luminosity_product == 'numberCt':
         pass
+    else:
+        print('You shouldn\'t be here...')
+
+    return(lum)
+
+### convert a luminosity byproduct into log luminosity byproduct
+def convert_lum_to_log(lum, luminosity_product, lumLogBinCents):
+    ### don't worry if it is already log
+    if luminosity_product == 'log':
+        pass
+    ### take the log if it is \phi
+    elif luminosity_product == 'basic':
+        lum = np.log10(lum)
+    ### divide by the luminosity and take the log if it is \phi*L
+    elif luminosity_product == 'basicL':
+        lum = np.log10(lum/lumLogBinCents)
     else:
         print('You shouldn\'t be here...')
 
