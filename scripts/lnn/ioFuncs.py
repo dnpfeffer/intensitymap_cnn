@@ -185,7 +185,7 @@ def get_model_iteration(model_name, model_matches=[], model_loc=[]):
     # get the number of models with that name with completed histories
     ct = 0
     for m in model_matches:
-        if model_name + '_history' in m:
+        if model_name + '_history' in m and m[:len(model_name)] == model_name:
             ct += 1
 
     ### return the count
