@@ -63,6 +63,12 @@
 
 			\item Something Finally Works \ref{sec:works}
 
+			\item Pre-loading Maps \ref{sec:pre_load}
+
+			\item Gaussian Noise and Foreground \ref{sec:noise2}
+
+			\item Results with Noise 2 (the first is in the third wave) \ref{sec:res_with_noise}
+
 			\item To do list \ref{sec:todo}
 		\end{enumerate}	
 
@@ -660,6 +666,73 @@
 			\label{fig:adam_training}
 		\end{figure}
 
+	\section{Small Note about Batch Normalization} \label{sec:batch_norm}
+		This is just a small note about batch normalization and how it seems to give weird results for the validation data.  In \cref{fig:adam_training} you can see that the validation data seems very noisy.  I did some testing and this seems to come from the batch normalization.  Even if there is no dropout and the validation data is the same as the training data I couldn't prevent the validation data from being really noisy with batch normalization.  Removing batch normalization allowed training and validation loss to be the same for the scenario I just mentioned.  I don't have plots to show this, but just take my word for it.  I'm not fully sure why it was doing that.  I know batch normalization treats training and normal evaluating differently, but I couldn't figure out what exactly was screwing with it.  Using a Resnet model seems to help cut down on excessive validation loss as will hopefully be seen in the next section \dnp{reference section after it is made}.
+
+	\section{Pre-loading Maps} \label{sec:pre_load}
+		To speed up training I've changed things around so that all maps are loaded before training.  The way things used to work was that the only thing that was preloaded were the file names of the maps and luminosity functions.  Every time a map was need it was loaded from disk and had noise added to it and then pooled.  Each map had this done each epoch and we were using at least 100 epochs so this was a lot of disk reads (around 6000 maps X 100 epochs = 600,000 disk reads).  This was slow and I think the way I originally did it made it so that it kept the files open after loading them so using more maps in the training data slowed it down further.  The setup has changed so that now all of the maps are loaded beforehand and pre-pooled for memory issues.  Using a 256X256X100 map reduced batch size and network size so going with 64X64X10 seems to work better for larger networks and faster training.  Maps are loaded, pooled and then stored as 64X64X10 objects.  The luminosity functions are also loaded for each map.  Noise of any kind of data augmentation are not done during load, but would happen when preparing batches to train on.  This allows training on different noise/augmentations each time a map is seen.
+
+		This dramatically speeds up the training process.  It requires a large amount of time to load everything, but after that it is very fast.  Loading all maps (around 6000) takes around an hour and a half, but it is worth it.  After making the loading setup to this new infrastructure I was probably able to train on double the data in half the time.  There were also speed ups in noise generation which can be seen in \cref{sec:noise2}.
+
+	\section{Gaussian Noise and Foregrounds } \label{sec:noise2}
+		It hasn't really been discussed yet and foregrounds have just been implemented so I should go over our noise.  As of right now we have the ability to add two different types of noise to our maps.  The first is Gaussian white noise and the second is noise due to foregrounds.  The white noise needs to be created as if the original map had that noise instead of assuming the coarser map had the noise on it.  Putting 11 \(\mu\)K white noise in 160 pixels and then pool them into a single pixel is different then pooling 160 pixels and then adding 11 \(\mu\)K noise.  We also need to be careful about how we are adding the white noise individually to pixels.  This white noise should only be additive.  You can't take away photons so event though it is a Gaussian with mean 0 and std \(\sigma\) we are only interested in the non-negative values.  This is a slight issue when considering the fact that the data is going to be pooled and we want to be efficient.
+
+		If we were being naive we would generate noise on the 256X256X100 maps and then pool that down to the smaller size.  This would work fine and is easy to do, but it actually really slow.  Generating \(6.5 \times 10^{6}\) random numbers, adding them up in batches of 160 and then adding that to an old map each time we look at a map adds up.  We could speed this up by adding the Gaussian noise to the pre-pooled maps.  To do this we need to turn 160 random number calls into one.  This can be done with the central limit theorem (I never thought I would really need to use this before).  This is not adding 160 Gaussian together because we aren't considering the negative values which changes the expected mean and variance in each pixel.  160 random numbers are enough to use the central limit theorem.  Instead of using a mean of 0 and std of \(\sigma\) you can use a new distribution with 
+		\begin{equation}
+			\mu' = \frac{160}{\sqrt{2 \pi}} \sigma
+		\end{equation}
+		and
+		\begin{equation}
+			\sigma' = \sqrt{\frac{160}{\sqrt{2}} (1 - \frac{1}{\pi})} \sigma.
+		\end{equation}
+		This replaces 160 calls with a single call and saves a lot of time.
+
+		We also need to add in the foregrounds that Pat provided the code for.  The models and parameters were taken from arXiv 0912.2335.  The code was modified to look at the total number of cross sectional pixels and then do a Poisson draw to see how many sources are in each pixel.  It actually does this without assigning the sources to the pixels yet.  The average is \(< 1\).  It then picks pixels at random and adds the source into it if it is non-zero.  It then calculates the foregrounds that should be in the x-y location and adds it to the z-channel.  This is actually done on a 64X64X100 map.  Lowering the number of x and y pixels increases the source density per pixel so that should be fine, but to not mess with the frequency band it is calculated correctly there and then pooled.  
+
+		With the optimizations that have been put into place noise generation per type of noise takes around an 1 second per batch (40 maps at the moment).  Without any noise it takes a little less than 1 second per batch so it is not a giant increase in training time.
+
+		It was later found out that the noise should actually be fully Gaussian and not just the positive value parts.  This changes the new expected mean and standard deviation to
+		\begin{equation}
+			\mu' = 0
+		\end{equation}
+		and
+		\begin{equation}
+			\sigma' = \sqrt{160}\sigma.
+		\end{equation}
+
+	\section{Results with Gaussian Noise and Foregrounds } \label{sec:res_with_noise}
+		Now that things are running with noise and foregrounds lets see how good models train on them.  In \cref{fig:resnet_noise,fig:resnet_foreground,fig:resnet_noisy_foreground} you can see the results for training with noise, foregrounds and noise+foregrounds.  These are all from a single map and aren't fully representative.  Just know that the models train better with pure noise then pure foregrounds at the moment.  Training on both gives the worst fit at the moment.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{resnet_noise.pdf}
+			\caption{Results of a Resnet trained on Li et al maps with small random parameters and \(11 \mu\)K white noise.}
+			\label{fig:resnet_noise}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{resnet_foreground.pdf}
+			\caption{Same as \cref{fig:resnet_noise}, but with foregrounds instead of noise.}
+			\label{fig:resnet_foreground}
+		\end{figure}
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{resnet_noisy_foreground.pdf}
+			\caption{Same as \cref{fig:resnet_noise}, but with foreground in addition to the white noise.}
+			\label{fig:resnet_noisy_foreground}
+		\end{figure}
+
+		Looking at \cref{fig:resnet_train} we see the issue with batch normalization again.  It's super noisy, but not as bad as before.
+
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.9\textwidth]{resnet_train.pdf}
+			\caption{Training of the model used for \cref{fig:resnet_noisy_foreground}.}
+			\label{fig:resnet_train}
+		\end{figure}
+
 	\section{Things to do for Dan in no particular order} \label{sec:todo}
 		\begin{enumerate}
 			\item \sout{Figure out what a good frequency bin size is}  COMAP can handle around 500 different frequency bins so using 100 is a lower limit.
@@ -692,11 +765,23 @@
 
 			\item Put info in about visualizing layers?  Can do this, but do we care right now?
 
-			\item Foregrounds?
+			\item \sout{Foregrounds.  Put in foreground code and make it fast enough to use}
 
 			\item Classifier between models?
 
-			\item More testing around working Adam model.  Expanded maps, train on full data instead of 500 maps, add in noise.
+			\item \sout{More testing around working Adam model.  Expanded maps, train on full data instead of 500 maps, add in noise.}
+
+			\item \sout{Speed up noise map generation}
+
+			\item Make noise truly Gaussian and not cut-off at 0
+
+			\item Random amounts of noise instead of a single \(\sigma\)
+
+			\item Randomize foreground generation parameters
+
+			\item Train only up to \(L \approx L_{sun}\)
+
+			\item Try without batch normalization?
 		\end{enumerate}
 
 
