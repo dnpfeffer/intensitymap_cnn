@@ -84,6 +84,11 @@ class ModelParams:
         self.make_map_noisy = 0
         self.random_augmentation = False
         self.insert_foreground = False
+        self.batchNorm_momentum = 0.99
+        self.noise_lower = None
+        self.noise_upper = None
+        self.noise_limits = (None,None)
+        self.random_foreground = False
 
     def setup_parser(self, parser):
         # add all of the arguments
@@ -120,7 +125,7 @@ class ModelParams:
                             help='Take the log of the temperature map or not')
         parser.add_argument('-nm', '--make_map_noisy', type=float,
                             default=self.make_map_noisy,
-                            help='Mean of the gaussian noise added to map in units of (micro K)')
+                            help='Mean of the gaussian noise added to map in units of (micro K).  Not usable with --noise_upper or noise_lower.')
         parser.add_argument('-ks', '--kernel_size', type=int,
                             default=self.kernel_size, help='Kernel size of convolution')
         parser.add_argument('-mal', '--map_loc', default=self.mapLoc,
@@ -146,6 +151,17 @@ class ModelParams:
                             default=self.random_augmentation, help='Train with random augmentations or not')
         parser.add_argument('-if', '--insert_foreground', type=self.str2bool,
                             default=self.insert_foreground, help='Train with foregrounds or not')
+        parser.add_argument('-bm', '--batchNorm_momentum', type=float,
+                            default=self.batchNorm_momentum,
+                            help='Momentum used by batch normalization')
+        parser.add_argument('-nl', '--noise_lower', type=float,
+                            default=self.noise_lower,
+                            help='Lower limit of noise to consider in units of (micro K).  Must be used with --noise_upper, not usable with --make_map_noisy.')
+        parser.add_argument('-nu', '--noise_upper', type=float,
+                            default=self.noise_upper,
+                            help='Upper limit of noise to consider in units of (micro K).  Must be used with --noise_lower, not usable with --make_map_noisy.')
+        parser.add_argument('-rf', '--random_foreground', type=self.str2bool,
+                            default=self.random_foreground, help='If foregrounds should be random or not')
 
     def read_parser(self, parser):
         # read in values for all of the argumnets
@@ -176,6 +192,10 @@ class ModelParams:
         self.modelLoc = '../../{0}/'.format(args.model_loc)
         self.random_augmentation = args.random_augmentation
         self.insert_foreground = args.insert_foreground
+        self.batchNorm_momentum = args.batchNorm_momentum
+        self.noise_lower = args.noise_lower
+        self.noise_upper = args.noise_upper
+        self.random_foreground = args.random_foreground
 
     def give_attributes(self, **kwargs):
         for key, val in kwargs.items():
@@ -191,7 +211,7 @@ class ModelParams:
             self.pix_x /= self.pre_pool
         else:
             exit_str = 'The pix_x value ({0}) must be divisible '\
-                'by the pre-pooling kernel size ({1})'
+                'by the pre-pooling kernel size ({1}).'
             sys.exit(
                 exit_str.format(self.pix_x, self.pre_pool))
 
@@ -199,7 +219,7 @@ class ModelParams:
             self.pix_y /= self.pre_pool
         else:
             exit_str = 'The pix_y value ({0}) must be divisible '\
-                'by the pre-pooling kernel size ({1})'
+                'by the pre-pooling kernel size ({1}).'
             sys.exit(
                 exit_str.format(self.pix_y, self.pre_pool))
 
@@ -207,9 +227,22 @@ class ModelParams:
             self.numb_maps /= self.pre_pool_z
         else:
             exit_str = 'The numb_maps value ({0}) must be divisible '\
-                'by the pre-pooling-z size ({1})'
+                'by the pre-pooling-z size ({1}).'
             sys.exit(
                 exit_str.format(self.numb_maps, self.pre_pool_z))
+
+        if self.make_map_noisy > 0 and (self.noise_lower is not None or self.noise_upper is not None):
+            sys.exit('make_map_noisy and noise_lower/noise_upper are being used together when they shouldn\'t.')
+
+        if (self.noise_lower is not None and self.noise_upper is None) or (self.noise_lower is None and self.noise_upper is not None):
+            sys.exit('Only one limit for the noise was given with noise_lower/noise_upper.  Both are required.')
+
+        if self.noise_lower is not None and self.noise_upper is not None:
+            if self.noise_upper < self.noise_lower:
+                exit_str = 'noise_upper < noise_smaller ({0} < {1}).  It needs to be the other way.'
+                sys.exit(exit_str.format(self.noise_upper, self.noise_lower))
+            self.noise_limits = (self.noise_lower, self.noise_upper)
+            self.make_map_noisy = 1
 
     def get_map_info(self, fName):
         # load mapa data
@@ -373,18 +406,26 @@ def make_dateset(model_params, base):
                                                                 model_params.pix_y,
                                                                 model_params.omega_pix,
                                                                 model_params.nu,
-                                                                model_params.pre_pool_z],
+                                                                model_params.pre_pool_z,
+                                                                0.1,
+                                                                model_params.random_foreground],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
     # this adds gaussian noise to pre-processed maps
     if model_params.make_map_noisy > 0:
+        if model_params.noise_limits[0] is not None:
+            noise = model_params.noise_limits
+        else:
+            noise = model_params.make_map_noisy
+
         dataset = dataset.map(lambda x, y:
                             tuple(tf.py_func(add_noise_after_pool_lum_wrapper, [x,
                                                                 y,
-                                                                model_params.make_map_noisy,
+                                                                noise,
                                                                 model_params.pre_pool,
-                                                                model_params.pre_pool_z],
+                                                                model_params.pre_pool_z,
+                                                                0.1],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
@@ -412,11 +453,6 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         fName = fName.decode("utf-8")
     mapData, lumData = fileToMapAndLum(fName, lumByproduct)
 
-    # add gaussian noise, but make sure it is positive valued
-    # if make_map_noisy > 0:
-    #     mapData = mapData + \
-    #         np.maximum(np.random.normal(0, make_map_noisy, mapData.shape), 0)
-
     if pre_pool > 1:
         if len(mapData) % pre_pool == 0:
             mapData = block_reduce(
@@ -425,9 +461,9 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
             pass
 
     if log_input:
-        mapData = np.log10(mapData + 1e-6)
-        mapData -= (-6)
-        # mapData -= (np.min(mapData))
+        # mapData = np.log10(mapData + 1e-6) + 6
+        # mapData = log_map(mapData + 1e3) - 3
+        mapData = log_modulus(mapData)
 
     # mean_map = np.mean(mapData)
     # std_map = np.std(mapData)
@@ -449,17 +485,30 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
     return(mapData, lumData)
 
 # function to add noise to a map after it has already been pooled
-def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z):
+def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z, chance_to_not=0.0):
 
-    # only add noise 90% of the time
-    if np.random.rand() < 0.9:
+    # only add noise some fraction of the time of the time
+    if np.random.rand() < (1-chance_to_not):
         shrink_size = pre_pool**2 * pre_pool_z
 
-        # Use central limit theorem and get a single draw for the noise
-        # assume 160 draws is enough and my math is correct to get new mean and variance
-        new_mean = shrink_size / np.sqrt(2*np.pi) * make_map_noisy
-        new_std = np.sqrt(shrink_size / 2 * make_map_noisy**2 * (1 - 1/np.pi))
-        noise = np.maximum(np.random.normal(new_mean, new_std, mapData.shape), 0)
+        # check if make_map_noisy is a scalar or list/tuple with min and max noise to conisder
+        if isinstance(make_map_noisy, (tuple, list, np.ndarray)):
+            if len(make_map_noisy) != 2:
+                sys.exit("A noise list was given that has more then 2 values.  Please only give a scalar or a list with a min and max")
+            else:
+                make_map_noisy = np.random.uniform(make_map_noisy[0], make_map_noisy[1])
+                # print(make_map_noisy)
+
+        # Old way of doing noise (incorrect because noise can be negative)
+        # # Use central limit theorem and get a single draw for the noise
+        # # assume 160 draws is enough and my math is correct to get new mean and variance
+        # new_mean = shrink_size / np.sqrt(2*np.pi) * make_map_noisy
+        # new_std = np.sqrt(shrink_size / 2 * make_map_noisy**2 * (1 - 1/np.pi))
+        # noise = np.maximum(np.random.normal(new_mean, new_std, mapData.shape), 0)
+
+        # new way of doing noise (noise can be negative)
+        new_std = np.sqrt(shrink_size) * make_map_noisy
+        noise = np.random.normal(0, new_std, mapData.shape)
 
         # add the noise to the map correctly
         mapData = add_to_processed_map(mapData, noise)
@@ -468,8 +517,9 @@ def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z):
 
 # function to add noise to a map after it has already been pooled
 # wraps around function that doesn't take the luminosity data
-def add_noise_after_pool_lum_wrapper(mapData, luminosity, make_map_noisy, pre_pool, pre_pool_z):
-    mapData = add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z)
+def add_noise_after_pool_lum_wrapper(mapData, luminosity, make_map_noisy, pre_pool, pre_pool_z, chance_to_not=0.0):
+    mapData = add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z,
+        chance_to_not=chance_to_not)
 
     return(mapData, luminosity)
 
@@ -525,25 +575,28 @@ def scaleMapAndLum(mapData, lumData, lumLogBinCents, bin_index_diff=-1):
     return(mapData, lumData)
 
 # function to add foreground noise into an intensity map
-def add_foreground_noise(mapData, Nx, Ny, Omega_pix, nu, pre_pool_z):
-    foreground = makeFGcube(int(Nx), int(Ny), Omega_pix, nu)
+def add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=0.0, random_foreground_params=False):
 
-    foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
-    foreground = foreground.reshape(mapData.shape)
+    # only add noise some fraction of the time of the time
+    if np.random.rand() < (1-chance_to_not):
+        foreground = makeFGcube(int(Nx), int(Ny), omega_pix, nu, random_foreground_params=random_foreground_params)
 
-    mapData = add_to_processed_map(mapData, foreground)
+        foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
+        foreground = foreground.reshape(mapData.shape)
+
+        mapData = add_to_processed_map(mapData, foreground)
 
     return(mapData)
 
 # function to add foreground noise into an intensity map
 # wraps around function that doesn't take the luminosity data
-def add_foreground_noise_lum_wrapper(mapData, lumData, Nx, Ny, omega_pix, nu, pre_pool_z):
-    mapData = add_foreground_noise(mapData, Nx, Ny, Omega_pix, nu, pre_pool_z)
+def add_foreground_noise_lum_wrapper(mapData, lumData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=0.0, random_foreground_params=False):
+    mapData = add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=chance_to_not, random_foreground_params=random_foreground_params)
 
     return(mapData, lumData)
 
 # make foreground data cube
-def makeFGcube(Nx,Ny,omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39,sigma_a=0.33):
+def makeFGcube(Nx,Ny,omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39,sigma_a=0.33, random_foreground_params=False):
     '''
     Function which generates intensity cube from point-source foregrounds based
     on observations in arXiv 0912.2335
@@ -560,6 +613,10 @@ def makeFGcube(Nx,Ny,omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39
     a0          Mean spectral index (fid: 0.39)
     sigma_a     Variance of Gaussian spectral index dist. (fid: 0.33)
     '''
+
+    if random_foreground_params:
+        N0 = np.random.normal(32.1, 3)
+        gamma = np.random.normal(2.18, 0.12)
 
     # Mean sources/pixel
     Nbar = N0*omega_pix
@@ -639,7 +696,24 @@ def binedge_to_binctr(binedge):
 
     return(binctr)
 
+# function to take log of map and prevent taking the log of negative numbers
+def log_map(cur_map):
+    cur_map = np.log10(cur_map + 1e3) - 3
+    return(cur_map)
+
 # function to add a map to a post-processed map
 def add_to_processed_map(old_map, new_map):
-    old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
+    # old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
+    # old_map = np.log10(np.power(10, old_map+3) + new_map) - 3
+
+    old_map = log_modulus(undo_log_modulus(old_map) + new_map)
+
     return(old_map)
+
+def log_modulus(cur_map):
+    cur_map = np.sign(cur_map) * np.log10(np.abs(cur_map) + 1e-6)
+    return(cur_map)
+
+def undo_log_modulus(cur_map):
+    cur_map = np.sign(cur_map) * (np.power(10, np.abs(cur_map)) - 1e-6)
+    return(cur_map)

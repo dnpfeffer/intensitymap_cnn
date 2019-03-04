@@ -69,9 +69,9 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
             pass
 
     if log_input:
-        cur_map = np.log10(cur_map + 1e-6)
-        # cur_map -= (np.min(cur_map))
-        cur_map -= (-6)
+        # cur_map = np.log10(cur_map + 1e-6)
+        # cur_map -= (-6)
+        cur_map = log_map(cur_map)
 
     ### add gaussian noise
     if make_map_noisy > 0:
