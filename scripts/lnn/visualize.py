@@ -54,7 +54,7 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 def test_model(model, base, base_number, luminosity_byproduct='log', threeD=False,
                 evaluate=True, log_input=False, make_map_noisy=0,
                 pre_pool=1, pre_pool_z=25, lum_func_size=None,
-                add_foregrounds=False):
+                add_foregrounds=False, random_foreground_params=False):
     # ### get the simulated map and luminosity byproduct
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
 
@@ -71,10 +71,13 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
     if log_input:
         # cur_map = np.log10(cur_map + 1e-6)
         # cur_map -= (-6)
-        cur_map = log_map(cur_map)
+        # cur_map = log_map(cur_map)
+        cur_map = log_modulus(cur_map)
 
     ### add gaussian noise
-    if make_map_noisy > 0:
+    if isinstance(make_map_noisy, (tuple, list, np.ndarray)):
+        cur_map = add_noise_after_pool(cur_map, make_map_noisy, pre_pool, pre_pool_z)
+    elif make_map_noisy > 0:
         cur_map = add_noise_after_pool(cur_map, make_map_noisy, pre_pool, pre_pool_z)
 
     # this is very janky and should be fixed
@@ -85,7 +88,7 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
         model_params.get_map_info(base[base_number] + '_map.npz')
 
         cur_map = add_foreground_noise(cur_map, model_params.pix_x, model_params.pix_y, model_params.omega_pix,
-                                model_params.nu, pre_pool_z)
+                                model_params.nu, pre_pool_z, random_foreground_params=random_foreground_params)
 
     if lum_func_size is not None:
         if lum_func_size >= 1:
@@ -145,16 +148,16 @@ def test_model_multiple_times(model, base, luminosity_byproduct='log',
     print(model.evaluate(dataset, steps=test_size, verbose=1))
 
 ### plot the results of a single CNN and map
-def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label):
-    ### get moving average of CNN result to make it look smoother
-    window_size = 5
-    window = np.ones(window_size)/float(window_size)
-    avg = np.convolve(cnn_lum[0], window, 'same')
+def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label, lum_func_size=49):
+    # ### get moving average of CNN result to make it look smoother
+    # window_size = 5
+    # window = np.ones(window_size)/float(window_size)
+    # avg = np.convolve(cnn_lum[0], window, 'same')
 
     ### plot the simulated and CNN data
-    plt.semilogx(lumLogBinCents, cnn_lum[0], label='CNN')
-    plt.semilogx(lumLogBinCents[2:], avg[2:], label='Smoothed CNN')
-    plt.semilogx(lumLogBinCents, cur_lum, label='Simulated')
+    plt.semilogx(lumLogBinCents[:lum_func_size], cnn_lum[0][:lum_func_size], label='CNN')
+    # plt.semilogx(lumLogBinCents[2:], avg[2:], label='Smoothed CNN')
+    plt.semilogx(lumLogBinCents[:lum_func_size], cur_lum[:lum_func_size], label='Simulated')
     plt.legend()
     plt.title('CNN Result')
     plt.xlabel('L (L_sun)')
@@ -178,17 +181,18 @@ def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label):
     return()
 
 ### plot the ratio of a CNN's result to the underlying simulation
-def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1):
+def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1, lum_func_size=49):
     ### get moving average of CNN result to make it look smoother
-    window_size = 5
-    window = np.ones(window_size)/float(window_size)
-    avg = np.convolve(cnn_lum[0], window, 'same')
+    # window_size = 5
+    # window = np.ones(window_size)/float(window_size)
+    # avg = np.convolve(cnn_lum[0], window, 'same')
 
     ### plot the ratio
-    ratio = cnn_lum[0]/cur_lum
-    ratio_smooth = avg/cur_lum
+    ratio = cnn_lum[0][:lum_func_size]/cur_lum[:lum_func_size]
+    lumLogBinCents = lumLogBinCents[:lum_func_size]
+    # ratio_smooth = avg/cur_lum
     plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label='CNN')
-    plt.semilogx(lumLogBinCents[2:-(end_cut_off)], ratio_smooth[2:-(end_cut_off)], label='Smoothed CNN')
+    # plt.semilogx(lumLogBinCents[2:-(end_cut_off)], ratio_smooth[2:-(end_cut_off)], label='Smoothed CNN')
 
     ### handle the title correclty based on the byproduct used
     if title == 'basic':
@@ -206,6 +210,8 @@ def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1):
     plt.ylabel('Predicted / Expected')
     plt.xlabel('L (L_sun)')
     plt.legend()
+
+    plt.ylim([0.8,1.2])
 
     plt.show()
 
