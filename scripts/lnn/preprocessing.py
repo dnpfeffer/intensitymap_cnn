@@ -717,3 +717,37 @@ def log_modulus(cur_map):
 def undo_log_modulus(cur_map):
     cur_map = np.sign(cur_map) * (np.power(10, np.abs(cur_map)) - 1e-6)
     return(cur_map)
+
+# get model info from configuration file
+def get_config_info(config, model_name):
+    model_params = {}
+
+    model_params['file_name'] = config[model_name]['file_name']
+    model_params['model_name'] = config[model_name]['model_name']
+    model_params['model_loc'] = config[model_name]['model_loc']
+    model_params['map_loc'] = config[model_name]['map_loc']
+    model_params['cardinality'] = int(config[model_name]['cardinality'])
+    model_params['give_weights'] = config[model_name].getboolean('give_weights')
+    model_params['use_bias'] = config[model_name].getboolean('give_weights')
+    model_params['pre_pool'] = int(config[model_name]['pre_pool'])
+    model_params['pre_pool_z'] = int(config[model_name]['pre_pool_z'])
+    model_params['pix_x'] = int(config[model_name]['pix_x'])
+    model_params['pix_y'] = int(config[model_name]['pix_y'])
+    model_params['pix_z'] = int(config[model_name]['pix_z'])
+    model_params['dense_layer'] = int(config[model_name]['dense_layer'])
+    model_params['base_filters'] = int(config[model_name]['base_filters'])
+    model_params['lum_func_size'] = int(config[model_name]['lum_func_size'])
+
+    model_params['luminosity_byproduct'] = config[model_name]['luminosity_byproduct']
+    model_params['threeD'] = config[model_name].getboolean('threeD')
+    model_params['log_input'] = config[model_name].getboolean('log_input')
+    model_params['make_map_noisy'] = float(config[model_name]['make_map_noisy'])
+    model_params['make_map_noisy2'] = float(config[model_name]['make_map_noisy2'])
+    model_params['add_foregrounds'] = config[model_name].getboolean('add_foregrounds')
+    model_params['random_foreground_params'] = config[model_name].getboolean('random_foreground_params')
+
+    # manage if random noise is requested
+    if model_params['make_map_noisy2'] != 0:
+        model_params['make_map_noisy'] = (model_params['make_map_noisy'], model_params['make_map_noisy2'])
+
+    return(model_params)

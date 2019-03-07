@@ -14,7 +14,8 @@ from tensorflow import keras as k
 ###############################################################
 
 ### plots the history of training a model and compares two metrics at the same time
-def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'], start_loc=1):
+def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'], start_loc=1,
+        do_val=True):
     ### set up plot
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
@@ -34,14 +35,19 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 
         ### actual plotting on each axis
         ax.semilogy(range(len(history[key]))[start_loc:], history[key][start_loc:], label=key, color=color)
-        ax.semilogy(range(len(history['val_' + key]))[start_loc:], history['val_' + key][start_loc:], color=color, ls='--')
+        if do_val:
+            ax.semilogy(range(len(history['val_' + key]))[start_loc:], history['val_' + key][start_loc:], color=color, ls='--')
         ax.set_ylabel(key, color=color)
         ax.tick_params('y', which='both', labelcolor=color)
 
     ### set up the legend to show training and validation line types
-    custom_lines = [Line2D([0], [0], linestyle='-', color='k', lw=1),
-                Line2D([0], [0], linestyle='--', color='k', lw=1)]
-    ax1.legend(custom_lines, ['Training', 'Validation'])
+    if do_val:
+        custom_lines = [Line2D([0], [0], linestyle='-', color='k', lw=1),
+                    Line2D([0], [0], linestyle='--', color='k', lw=1)]
+        ax1.legend(custom_lines, ['Training', 'Validation'])
+    else:
+        custom_lines = [Line2D([0], [0], linestyle='-', color='k', lw=1)]
+        ax1.legend(custom_lines, ['Training'])
 
     ### display the plot
     ax1.set_xlabel('Epoch')
@@ -55,7 +61,7 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
                 evaluate=True, log_input=False, make_map_noisy=0,
                 pre_pool=1, pre_pool_z=25, lum_func_size=None,
                 add_foregrounds=False, random_foreground_params=False):
-    # ### get the simulated map and luminosity byproduct
+    # get the simulated map and luminosity byproduct
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
 
     # cur_map = np.zeros(cur_map.shape)
@@ -80,7 +86,7 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
     elif make_map_noisy > 0:
         cur_map = add_noise_after_pool(cur_map, make_map_noisy, pre_pool, pre_pool_z)
 
-    # this is very janky and should be fixed
+    # add in foregrounds
     if add_foregrounds:
         model_params = ModelParams()
         model_params.give_attributes(pre_pool=4, pre_pool_z=10)
@@ -438,40 +444,50 @@ def logcosh_rel(y_true, y_pred):
     return(sum(non_inf_diff)/len(non_inf_diff))
 
 ### gets the expected output and ratios of expected output for a single model on multiple maps
-def get_model_ratios(model, base, base_numbers, luminosity_length=49, luminosity_byproduct='log',
-                threeD=False, evaluate=False, log_input=False, make_map_noisy=0):
+def get_model_ratios(model, base, base_numbers, lum_func_size=49, luminosity_byproduct='log',
+                threeD=False, evaluate=False, log_input=False, make_map_noisy=0,
+                pre_pool=1, pre_pool_z=25,
+                add_foregrounds=False, random_foreground_params=False):
 
     ### lists to store results
-    simulated_lums = np.zeros([len(base_numbers), luminosity_length])
-    cnn_lums = np.zeros([len(base_numbers), luminosity_length])
-    ratio_of_lums = np.zeros([len(base_numbers), luminosity_length])
-    real_space_ratio_of_lums = np.zeros([len(base_numbers), luminosity_length])
+    simulated_lums = np.zeros([len(base_numbers), lum_func_size])
+    cnn_lums = np.zeros([len(base_numbers), lum_func_size])
+    ratio_of_lums = np.zeros([len(base_numbers), lum_func_size])
+    real_space_ratio_of_lums = np.zeros([len(base_numbers), lum_func_size])
 
     ### get the output for each map
     for i, b in enumerate(base_numbers):
-        temp_sim_lum, temp_cnn_lum = test_model(model, base, b, luminosity_byproduct=luminosity_byproduct, threeD=threeD,
-                    evaluate=evaluate, log_input=log_input, make_map_noisy=make_map_noisy)
+        temp_sim_lum, temp_cnn_lum, temp_loss = test_model(model, base, b, luminosity_byproduct=luminosity_byproduct, threeD=threeD,
+                    evaluate=evaluate, log_input=log_input, make_map_noisy=make_map_noisy,
+                    pre_pool=pre_pool, pre_pool_z=pre_pool_z, lum_func_size=lum_func_size,
+                    add_foregrounds=add_foregrounds, random_foreground_params=random_foreground_params)
 
         ### store output and make ratio list
         simulated_lums[i] = temp_sim_lum
         cnn_lums[i] = temp_cnn_lum
         ratio_of_lums[i] = (temp_cnn_lum/temp_sim_lum)[0]
-        real_space_ratio_of_lums[i]
+        # real_space_ratio_of_lums[i]
 
     return(simulated_lums, cnn_lums, ratio_of_lums)
 
 ### function to give the stds of error for given ratio arrays
 def std_of_model(ratio_of_lums):
-    stds = np.zeros(len(ratio_of_lums[0]))
+    stds_upper = np.zeros(len(ratio_of_lums[0]))
+    stds_lower = np.zeros(len(ratio_of_lums[0]))
 
     ### find the std of error but use 1 as the mean instead of the actual mean
     for i in range(len(ratio_of_lums[0])):
-        std = 0
+        std_upper = 0
+        std_lower = 0
         for j in ratio_of_lums[:,i]:
-            std += (j - 1)**2
-        stds[i] = np.sqrt(std/len(ratio_of_lums[:,i]))
+            if j > 1:
+                std_upper += (j - 1)**2
+            else:
+                std_lower += (j - 1)**2
+        stds_upper[i] = np.sqrt(std_upper/(len(ratio_of_lums[:,i])-1))
+        stds_lower[i] = np.sqrt(std_lower/(len(ratio_of_lums[:,i])-1))
 
-    return(stds)
+    return(stds_lower, stds_upper)
 
 ### function to plot rough 95% contour around perfect prediction for different models
 def prediction_contour_plot(model_labels, model_lowers, model_uppers, model_lums, ratio_type='log', y_range=[0.7, 1.3], white_noise=0):

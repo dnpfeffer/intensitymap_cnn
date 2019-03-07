@@ -168,6 +168,18 @@ def load_history(history_path):
         history = pickle.load(pickle_file)
     return(history)
 
+# function to save pickle objects
+def save_pickle(data, file_name, file_type='.pkl'):
+    with open(file_name + file_type, 'wb') as f:
+        pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+    return()
+
+# function to load pickle objects
+def load_pickle(file_name, file_type='.pkl'):
+    with open(file_name + file_type, 'rb') as f:
+        data =  pickle.load(f)
+    return(data)
+
 # gets the number of times a model has been trained
 def get_model_iteration(model_name, model_matches=[], model_loc=[]):
     # handle the possible inputs
