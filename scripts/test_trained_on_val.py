@@ -24,9 +24,6 @@ config_name = args.file_name
 if config_name == '':
     sys.exit('Must give a config file name with -fn')
 
-# debug
-debug_map_numbs = 2
-
 # where to store things
 data_loc = '../data/'
 predict_loc = data_loc + 'predictions/'
@@ -54,6 +51,10 @@ valPer = 0.2
 valPoint = int(len(subFields) * (1 - valPer))
 base_val = [cur_map_loc + s for s in subFields[valPoint:]]
 
+# debug
+# debug_map_numbs = 2
+# base_val = base_val[:debug_map_numbs]
+
 # load in maps
 data_val = np.array([lnn.utf8FileToMapAndLum(x, defaults['luminosity_byproduct'],
                                         defaults['threeD'],
@@ -61,14 +62,14 @@ data_val = np.array([lnn.utf8FileToMapAndLum(x, defaults['luminosity_byproduct']
                                         defaults['make_map_noisy'],
                                         defaults['pre_pool'],
                                         defaults['pre_pool_z'],
-                                        defaults['lum_func_size']) for x in base_val[:debug_map_numbs]])
+                                        defaults['lum_func_size']) for x in base_val])
 
 # start iterating for each model
 for model_name in models:
     model_params = lnn.get_config_info(config, model_name)
 
-    print('Doing model {0}'.format(model_params['model_name']))
-    print(model_params)
+    #print('Doing model {0}'.format(model_params['model_name']))
+    #print(model_params)
 
     model = get_master_res_next(model_params['model_loc'], model_params['pix_x'],
                                 model_params['pix_y'], model_params['pix_z'],
@@ -81,25 +82,25 @@ for model_name in models:
     # dict to store everything
     stored_predictions = {}
 
-    for data, base in zip(data_val, base_val[:debug_map_numbs]):
+    for data, base in zip(data_val, base_val):
         cur_map = data[0]
         cur_lum = data[1]
 
-        print('Testing on map {0}'.format(base))
+        #print('Testing on map {0}'.format(base))
 
         ### add gaussian noise
         if isinstance(model_params['make_map_noisy'], (tuple, list, np.ndarray)):
-            print('doing random noise')
+            #print('doing random noise')
             cur_map = lnn.add_noise_after_pool(cur_map, model_params['make_map_noisy'],
                                                model_params['pre_pool'], model_params['pre_pool_z'])
         elif model_params['make_map_noisy'] > 0:
-            print('doing normal noise')
+            #print('doing normal noise')
             cur_map = lnn.add_noise_after_pool(cur_map, model_params['make_map_noisy'],
                                                model_params['pre_pool'], model_params['pre_pool_z'])
 
         # add in foregrounds
         if model_params['add_foregrounds']:
-            print('adding foregrounds')
+            #print('adding foregrounds')
             model_params_obj = lnn.ModelParams()
             model_params_obj.give_attributes(pre_pool=model_params['pre_pool'], pre_pool_z=model_params['pre_pool_z'])
             model_params_obj.clean_parser_data()
@@ -110,10 +111,21 @@ for model_name in models:
                                                model_params['pre_pool_z'],
                                                random_foreground_params=model_params['random_foreground_params'])
 
+        # add in geometric noise
+        if model_params['geometric_noise']:
+            cur_map = lnn.add_geometric_noise_after_pool(cur_map,
+                model_params['pre_pool'], model_params['pre_pool_z'],
+                noise_fraction=1.0/22, max_noise=100)
+
+        # don't try looking at things with under 500 sources at 10^6 L_sun
+        if model_params['only_bright']:
+            if cur_lum[36] < np.log10(5*10**2):
+                pass
+
         ### make sure the output size is correct
         if model_params['lum_func_size'] is not None:
             if model_params['lum_func_size'] >= 1:
-                print('changing the size of the output luminosity function')
+                #print('changing the size of the output luminosity function')
                 cur_lum = cur_lum[:model_params['lum_func_size']]
             else:
                 cur_lum = cur_lum[model_params['lum_func_size']:]
@@ -132,4 +144,4 @@ for model_name in models:
         stored_predictions[base] = [cnn_lum[0], cur_lum]
 
     # save results after going through a model fully
-    lnn.save_pickle(stored_predictions, predict_loc + model_params['model_name'])
+    lnn.save_pickle(stored_predictions, predict_loc + model_params['file_name'])

@@ -718,6 +718,70 @@ def undo_log_modulus(cur_map):
     cur_map = np.sign(cur_map) * (np.power(10, np.abs(cur_map)) - 1e-6)
     return(cur_map)
 
+# add noise based on distance from edge of map
+# after the map has been pooled already
+def add_geometric_noise_after_pool(mapData, pre_pool, pre_pool_z, noise_fraction=1.0/22, max_noise=100):
+    pre_shape = mapData.shape
+    shape = (pre_shape[0]*pre_pool, pre_shape[1]*pre_pool, pre_shape[2]*pre_pool_z)
+
+    noise_map = make_geometric_noise_map(shape, noise_fraction, max_noise)
+
+    noise_map = block_reduce(noise_map, (pre_pool,pre_pool,pre_pool_z), np.sum)
+    noise_map = noise_map.reshape(mapData.shape)
+    mapData = add_to_processed_map(mapData, noise_map)
+
+    return(mapData)
+
+# make geometric noise map
+def make_geometric_noise_map(shape, noise_fraction=1.0/22, max_noise=100):
+    noise_map = np.zeros(shape)
+
+    x_max = int(noise_fraction*noise_map.shape[0])
+    y_max = int(noise_fraction*noise_map.shape[1])
+    x_range = np.arange(-x_max, x_max)
+    y_range = np.arange(-y_max, y_max)
+
+    for i in x_range:
+        for j in range(noise_map.shape[1]):
+            for k in range(noise_map.shape[2]):
+                noise_map[i,j,k] = geometric_noise(i, j, noise_map.shape, noise_fraction, max_noise)
+
+    for i in range(noise_map.shape[0]):
+        if i in x_range:
+            continue
+        for j in y_range:
+            for k in range(noise_map.shape[2]):
+                noise_map[i,j,k] = geometric_noise(i, j, noise_map.shape, noise_fraction, max_noise)
+
+    return(noise_map)
+
+# figure out noise in pixel based on location
+def geometric_noise(i, j, shape, noise_fraction=1.0/22, max_noise=100):
+    if i < 0:
+        i = shape[0]+i
+    if j < 0:
+        j = shape[1]+j
+
+    x_frac = i/shape[0]
+    # if the pixel is more then halfway consider 1-x_pix_location
+    if x_frac > 0.5:
+        x_frac = 1 - x_frac
+    x_noise = max(1.0-x_frac/noise_fraction, 0)
+    x_noise = x_noise * max_noise
+
+    y_frac = j/shape[1]
+    # if the pixel is more then halfway consider 1-x_pix_location
+    if y_frac > 0.5:
+        y_frac = 1 - y_frac
+    y_noise = max(1.0-y_frac/noise_fraction, 0)
+    y_noise = y_noise * max_noise
+
+    noise_frac = max(x_noise, y_noise)
+    noise = np.random.normal(0, noise_frac * max_noise)
+
+    return(noise)
+
+
 # get model info from configuration file
 def get_config_info(config, model_name):
     model_params = {}
@@ -745,6 +809,9 @@ def get_config_info(config, model_name):
     model_params['make_map_noisy2'] = float(config[model_name]['make_map_noisy2'])
     model_params['add_foregrounds'] = config[model_name].getboolean('add_foregrounds')
     model_params['random_foreground_params'] = config[model_name].getboolean('random_foreground_params')
+
+    model_params['geometric_noise'] = config[model_name].getboolean('geometric_noise')
+    model_params['only_bright'] = config[model_name].getboolean('only_bright')
 
     # manage if random noise is requested
     if model_params['make_map_noisy2'] != 0:
