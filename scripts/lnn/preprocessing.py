@@ -892,9 +892,6 @@ def get_config_info(config, model_name):
     model_params['add_foregrounds'] = config[model_name].getboolean('add_foregrounds')
     model_params['random_foreground_params'] = config[model_name].getboolean('random_foreground_params')
 
-    model_params['geometric_noise'] = config[model_name].getboolean('geometric_noise')
-    model_params['only_bright'] = config[model_name].getboolean('only_bright')
-
     # manage if random noise is requested
     if model_params['make_map_noisy2'] != 0:
         model_params['make_map_noisy'] = (model_params['make_map_noisy'], model_params['make_map_noisy2'])

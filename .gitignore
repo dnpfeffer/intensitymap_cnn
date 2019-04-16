@@ -15,9 +15,9 @@
 *.fdb_latexmk
 
 ### Directories for maps, catalogs and models
-mapss*/*
-catalogues*/*
-models*/*
+maps*
+catalogues*
+models*
 
 ### A thing Dan uses for FTP
 ftp_scripts/*

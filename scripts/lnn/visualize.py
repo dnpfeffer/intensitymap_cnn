@@ -15,6 +15,27 @@ from tensorflow import keras as k
 ### Jupyter Notebook Plotting Tools ###
 ##########################################
 
+# plot_single_history
+def plot_single_history(history, start_loc=1, do_val=True):
+    fig, ax = plt.subplots(figsize=(9, 6))
+    # fig, ax = plt.subplots()
+
+    key = 'loss'
+    # color = 'k'
+    p = ax.semilogy(range(len(history[key]))[start_loc:], history[key][start_loc:],
+    label='Training')
+    if do_val:
+        color = p[-1].get_color()
+        ax.semilogy(range(len(history['val_' + key]))[start_loc:],
+        history['val_' + key][start_loc:], ls='--', label='Validation', color=color)
+
+    ### display the plot
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    ax.legend()
+    fig.tight_layout()
+    return(ax)
+
 # plots the history of training a model and compares two metrics at the same time
 def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'], start_loc=1, do_val=True):
     # set up plot
@@ -60,10 +81,13 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 # get the predicted and simulated luminosity function byproduct for a given model and map
 def test_model(model, base, base_number, luminosity_byproduct='log', threeD=False, evaluate=True,
     log_input=False, make_map_noisy=0, pre_pool=1, pre_pool_z=25, lum_func_size=None,
-    add_foregrounds=False, random_foreground_params=False):
+    add_foregrounds=False, random_foreground_params=False, rotate=0):
 
     # get the simulated map and luminosity byproduct
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
+
+    if rotate != 0:
+        cur_map = np.rot90(cur_map, k=int(rotate))
 
     # cur_map = np.zeros(cur_map.shape)
     # cur_lum = np.zeros(cur_lum.shape)
