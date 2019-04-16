@@ -20,6 +20,8 @@ def saveMapAndLum(maps, lumInfo):
     name = fileName.name[:-len(fileName.suffix)] + '_lum.npz'
     saveLumFunc(lumInfo, loc=loc, name=name)
 
+    return()
+
 # wrapper function to save a map
 # has function to change the name and location of the file
 def saveMap(maps, loc='.', name='test_map.npz'):
@@ -58,9 +60,10 @@ def checkDirectoryPath(loc):
 # function to load any tpye of data np can load
 def loadData(fName):
     loaded_data = np.load(fName)
+
     return(loaded_data)
 
-# function to load map data that isn't the map_cube
+# function to load map data that isn't in the the map_cube
 def loadMap_data(fName):
     info = {}
     with np.load(fName) as data:
@@ -76,7 +79,7 @@ def loadMap(fName):
 
     return(mapData)
 
-# function to load an intensity map
+# function to load the luminosity function of an intensity map
 def loadLums(fName, lumByproduct='basic'):
     with np.load(fName) as data:
         lumData = lumFuncByproduct(data, lumByproduct=lumByproduct)
@@ -93,12 +96,12 @@ def loadMapAndLum(baseFName, lumByproduct='basic'):
 # function to directly load the log bin centers from a given base file name
 def loadLogBinCenters(baseFName):
     lumLogBinCents = loadData(baseFName + '_lum.npz')['logBinCent']
+
     return(lumLogBinCents)
 
 # function to get all of the subfield catalogs in a directory
 def loadSubFields(loc):
     names = loadDirNpzs(loc)
-
     subFieldNames = [n for n in names if 'subfield' in n]
 
     return(subFieldNames)

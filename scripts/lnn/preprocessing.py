@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-# import astropy.units as u
 import sys
 import time
 
@@ -12,6 +11,7 @@ from .ioFuncs import *
 # needed to save the map
 from limlam_mocker import limlam_mocker as llm
 
+# class containing info needed to train a CNN
 class ModelParams:
     def __init__(self):
         # continue training an old network or start a new one
@@ -90,8 +90,11 @@ class ModelParams:
         self.noise_limits = (None,None)
         self.random_foreground = False
 
+        return()
+
+    # setup command line parser arguments
     def setup_parser(self, parser):
-        # add all of the arguments
+        # add all of the arguments for command line parsing
         parser.add_argument('-fn', '--file_name', default='',
                             help='What file name to use')
         parser.add_argument('-c', '--continue_training',
@@ -163,6 +166,9 @@ class ModelParams:
         parser.add_argument('-rf', '--random_foreground', type=self.str2bool,
                             default=self.random_foreground, help='If foregrounds should be random or not')
 
+        return()
+
+    # read values from parser
     def read_parser(self, parser):
         # read in values for all of the argumnets
         args = parser.parse_args()
@@ -197,16 +203,21 @@ class ModelParams:
         self.noise_upper = args.noise_upper
         self.random_foreground = args.random_foreground
 
+        return()
+
+    # set specific key value pairs for ModelParams attributes
     def give_attributes(self, **kwargs):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
+    # do extra work on some parser parameters such as fixing pixel sizes
     def clean_parser_data(self):
+        # make sure there is a file name
         if self.fileName == '':
             self.fileName = make_file_name(
                 self.luminosity_byproduct, self.numb_layers, self.ThreeD, self.base_filters)
 
-        # if there is a non-one pre_pool value, change the pix_x and pix_x accordingly
+        # if there is a non-one pre_pool value, change the pix_x, pix_x and numb_maps accordingly
         if self.pix_x % self.pre_pool == 0:
             self.pix_x /= self.pre_pool
         else:
@@ -231,6 +242,7 @@ class ModelParams:
             sys.exit(
                 exit_str.format(self.numb_maps, self.pre_pool_z))
 
+        # make sure noise parameters are given correctly and don't comflict with each other
         if self.make_map_noisy > 0 and (self.noise_lower is not None or self.noise_upper is not None):
             sys.exit('make_map_noisy and noise_lower/noise_upper are being used together when they shouldn\'t.')
 
@@ -244,6 +256,9 @@ class ModelParams:
             self.noise_limits = (self.noise_lower, self.noise_upper)
             self.make_map_noisy = 1
 
+        return()
+
+    # set basic map info about angular size and frequencies used for a given map
     def get_map_info(self, fName):
         # load mapa data
         data = loadMap_data(fName)
@@ -252,6 +267,9 @@ class ModelParams:
         self.omega_pix = data['omega_pix'] * self.pre_pool**2
         self.nu = data['nu']
 
+        return()
+
+    # string to bool for the parser
     def str2bool(self, v):
         if v.lower() in ('yes', 'true', 't', 'y', '1'):
             return True
@@ -260,7 +278,9 @@ class ModelParams:
         else:
             raise argparse.ArgumentTypeError('Boolean value expected.')
 
+    # check to see if training should continue or not
     def continue_training_check(self):
+        # return the loaded old model if training is to continue
         if self.continue_training:
             continue_count = get_model_iteration(self.fileName, model_loc=self.modelLoc)
 
@@ -273,6 +293,7 @@ class ModelParams:
             self.continue_name = ''
             return(None)
 
+    # set which type of loss to use
     def set_loss(self, losses):
         # choose which loss to use
         if self.luminosity_byproduct == 'log':
@@ -289,8 +310,11 @@ class ModelParams:
 
         self.loss = loss
 
+        return()
+
 # make a file name from the given model information
 def make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters):
+    # keep track of luminosity byproduct used
     if luminosity_byproduct == 'log':
         lb_string = 'log'
     elif luminosity_byproduct == 'basic':
@@ -301,22 +325,26 @@ def make_file_name(luminosity_byproduct, numb_layers, ThreeD, base_filters):
         print('There should not be a way for someone to be in make_file_name without a valid luminosity_byproduct: {0}'.format(luminosity_byproduct))
         exit(0)
 
+    # is this 3d or 2d (it should be 2d)
     if ThreeD:
         ThreeD_string = '3D'
     else:
         ThreeD_string = '2D'
 
+    # full file name
     file_name = '{0}_lum_{1}_layer_{2}_{3}_filters_model'.format(lb_string, numb_layers, ThreeD_string, base_filters)
 
     return(file_name)
 
+# setup checkpoints to be used for training to track loss and save periodically
 def setup_checkpoints(model_params, callbacks):
+    # save the model every so often based on model_params.callBackPeriod
     filePath = model_params.modelLoc + model_params.fileName + '_temp' + model_params.continue_name + '.hdf5'
     checkpoint = callbacks.ModelCheckpoint(
         filePath, monitor='loss', verbose=1, save_best_only=False,
         mode='auto', period=model_params.callBackPeriod)
 
-
+    # keep track of loss information every epoch
     class LossHistory(callbacks.Callback):
         def on_train_begin(self, logs={}):
             self.losses = []
@@ -330,11 +358,14 @@ def setup_checkpoints(model_params, callbacks):
             self.val_loss.append(logs.get('val_loss'))
             self.val_loss.append(logs.get('val_mean_squared_error'))
 
-
     history = LossHistory()
 
+    # package the two checkpoints together
     callbacks_list = [checkpoint, history]
 
+    return(callbacks_list)
+
+# load in data for training and package it for training
 def setup_datasets(model_params):
     print('Starting to load data...')
     subFields = loadBaseFNames(model_params.mapLoc)
@@ -345,21 +376,32 @@ def setup_datasets(model_params):
     np.random.shuffle(subFields)
     np.random.seed()
 
-    # shuffle  test and validation data
+    # shuffle test and validation data
     valPoint = int(len(subFields) * (1 - model_params.valPer))
+
+    # base file names for training data
     base = [model_params.mapLoc + s for s in subFields[:valPoint]]
 
+    # only load a certain number of files if requested
     if model_params.train_number > 0:
         base = base[:model_params.train_number]
 
+    # base file names for validation data
     base_val = [model_params.mapLoc + s for s in subFields[valPoint:]]
+
+    # shuffle the order of the maps
     np.random.shuffle(base)
     np.random.shuffle(base_val)
 
+    # put map information into our ModelParams object
     model_params.get_map_info(base[0] + '_map.npz')
 
+    # make dataset used by tensorflow and modify maps with noise, foregrounds and etc
     dataset = make_dateset(model_params, base)
 
+    # don't load the whole dataset if you are training on less maps then that
+    # this was used for tests and shouldn't happen normally
+    # also make the dataset for the validation data
     if model_params.train_number < len(base_val) and model_params.train_number > 0:
         dataset_val = make_dateset(model_params, base)
     else:
@@ -368,6 +410,7 @@ def setup_datasets(model_params):
     print('Data fully loaded')
     return(dataset, dataset_val)
 
+# load IMs, augment them with noise, foregrounds and etc and package into datasets for tensorflow
 def make_dateset(model_params, base):
     # time how long it takes to load data
     start = time.time()
@@ -381,9 +424,11 @@ def make_dateset(model_params, base):
     end = time.time()
     print('Time to load data:', end - start)
 
+    # split the IMs and luminosity functions (features and labels)
     features = np.stack(data[:,0])
     labels = np.stack(data[:,1])
 
+    # start making the dataset
     dataset = tf.data.Dataset.from_tensor_slices((features, labels))
     dataset = dataset.shuffle(buffer_size=len(features))
 
@@ -429,17 +474,18 @@ def make_dateset(model_params, base):
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
+    # repeat dataset when it goes through all maps
     dataset = dataset.repeat()
+    # set the batch size to what was given in ModelParams
     dataset = dataset.batch(model_params.batch_size)
+    # prefetch 2 maps at a time to help speed up loading maps onto GPUs
     dataset = dataset.prefetch(2)
 
     return(dataset)
 
-# function to convert a basename into the map map_cube and the wanted luminosity byproduct
+# function to convert a base name into the map map_cube and the wanted luminosity byproduct
 def fileToMapAndLum(fName, lumByproduct='basic'):
     mapData, lumData = loadMapAndLum(fName, lumByproduct=lumByproduct)
-    # mapData = maps['map_cube']
-    # lumData = lumFuncByproduct(lumInfo, lumByproduct)
 
     return(mapData, lumData)
 
@@ -447,12 +493,16 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
 def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
     make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
 
+    # be careful with strings sometime not being strings and needing to decode them
     if type(lumByproduct) is not str:
         lumByproduct = lumByproduct.decode("utf-8")
     if type(fName) is not str:
         fName = fName.decode("utf-8")
+
+    # load file name and luminosity byproduct type to map and luminosity byproduct type
     mapData, lumData = fileToMapAndLum(fName, lumByproduct)
 
+    # pool the data if it is requested
     if pre_pool > 1:
         if len(mapData) % pre_pool == 0:
             mapData = block_reduce(
@@ -460,6 +510,7 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         else:
             pass
 
+    # use a log of some sorts to make the IM values span a single order of magnitude
     if log_input:
         # mapData = np.log10(mapData + 1e-6) + 6
         # mapData = log_map(mapData + 1e3) - 3
@@ -470,6 +521,7 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
 
     # mapData = (mapData - mean_map)/std_map
 
+    # decide if you want to use all luminosity values or a subset of them
     if lum_func_size is not None:
         if lum_func_size >= 1:
             # lumData = lumData[::lum_func_size]
@@ -477,6 +529,7 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         else:
             lumData = lumData[lum_func_size:]
 
+    # give an extra dimension to the map if it is using 3d convolutions
     if ThreeD:
         # make sure to reshape the map data for the 3D convolutions
         mapData = mapData.reshape(len(mapData), len(
@@ -559,12 +612,15 @@ def set_map_to_zero(mapData, lumData):
 # function to scale scale luminosities and the luminosity function
 # to get more test data
 def scaleMapAndLum(mapData, lumData, lumLogBinCents, bin_index_diff=-1):
+    # if not given an index, randomly decide what luminosity to scale against
     if bin_index_diff == -1:
         bin_index_diff = int(np.random.poisson(5))
 
+    # find ratio of luminosities for scaling and scale the map
     ratio = lumLogBinCents[0] / lumLogBinCents[0 + bin_index_diff]
     mapData = mapData * ratio
 
+    # move over luminosity data to new bins to keep the correct amount of intensity at each luminosity
     lum_size = len(lumLogBinCents)
     for i, lum in enumerate(lumData):
         if i + bin_index_diff < lum_size:
@@ -579,11 +635,14 @@ def add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_n
 
     # only add noise some fraction of the time of the time
     if np.random.rand() < (1-chance_to_not):
+        # make foreground map
         foreground = makeFGcube(int(Nx), int(Ny), omega_pix, nu, random_foreground_params=random_foreground_params)
 
+        # reduce map in z direction
         foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
         foreground = foreground.reshape(mapData.shape)
 
+        # add foreground to current map
         mapData = add_to_processed_map(mapData, foreground)
 
     return(mapData)
@@ -710,22 +769,30 @@ def add_to_processed_map(old_map, new_map):
 
     return(old_map)
 
+# special function to take log of positive and negative values and still work
+# probably should use 1 instead of 1e-6 in the log and it wouldn't change anything
 def log_modulus(cur_map):
     cur_map = np.sign(cur_map) * np.log10(np.abs(cur_map) + 1e-6)
+
     return(cur_map)
 
+# undoes the log_modulus function
 def undo_log_modulus(cur_map):
     cur_map = np.sign(cur_map) * (np.power(10, np.abs(cur_map)) - 1e-6)
+
     return(cur_map)
 
 # add noise based on distance from edge of map
 # after the map has been pooled already
 def add_geometric_noise_after_pool(mapData, pre_pool, pre_pool_z, noise_fraction=1.0/22, max_noise=100):
+    # get current shape of map and original shape
     pre_shape = mapData.shape
     shape = (pre_shape[0]*pre_pool, pre_shape[1]*pre_pool, pre_shape[2]*pre_pool_z)
 
+    # make geometric noise map on original map
     noise_map = make_geometric_noise_map(shape, noise_fraction, max_noise)
 
+    # pool the geometric noise map and add it to the original map
     noise_map = block_reduce(noise_map, (pre_pool,pre_pool,pre_pool_z), np.sum)
     noise_map = noise_map.reshape(mapData.shape)
     mapData = add_to_processed_map(mapData, noise_map)
@@ -734,18 +801,22 @@ def add_geometric_noise_after_pool(mapData, pre_pool, pre_pool_z, noise_fraction
 
 # make geometric noise map
 def make_geometric_noise_map(shape, noise_fraction=1.0/22, max_noise=100):
+    # make an empty map of the correct size
     noise_map = np.zeros(shape)
 
+    # set the max x and y pixel positions to worry about
     x_max = int(noise_fraction*noise_map.shape[0])
     y_max = int(noise_fraction*noise_map.shape[1])
     x_range = np.arange(-x_max, x_max)
     y_range = np.arange(-y_max, y_max)
 
+    # loop through all x pixels that may matter and add noise
     for i in x_range:
         for j in range(noise_map.shape[1]):
             for k in range(noise_map.shape[2]):
                 noise_map[i,j,k] = geometric_noise(i, j, noise_map.shape, noise_fraction, max_noise)
 
+    # go through all y values and go to x values if they don't already have noise
     for i in range(noise_map.shape[0]):
         if i in x_range:
             continue
@@ -757,35 +828,46 @@ def make_geometric_noise_map(shape, noise_fraction=1.0/22, max_noise=100):
 
 # figure out noise in pixel based on location
 def geometric_noise(i, j, shape, noise_fraction=1.0/22, max_noise=100):
+    # consider negative values to be on the right or bottom of map
     if i < 0:
         i = shape[0]+i
     if j < 0:
         j = shape[1]+j
 
+    # get fraction from side of map in x-direction
     x_frac = i/shape[0]
+
     # if the pixel is more then halfway consider 1-x_pix_location
     if x_frac > 0.5:
         x_frac = 1 - x_frac
+
+    # get noise that should be in pixel due to distance from x-boundary
     x_noise = max(1.0-x_frac/noise_fraction, 0)
     x_noise = x_noise * max_noise
 
+    # get fraction from side of map in y-direction
     y_frac = j/shape[1]
+
     # if the pixel is more then halfway consider 1-x_pix_location
     if y_frac > 0.5:
         y_frac = 1 - y_frac
+
+    # get noise that should be in pixel due to distance from y-boundary
     y_noise = max(1.0-y_frac/noise_fraction, 0)
     y_noise = y_noise * max_noise
 
+    # figure out which noise matters more and use it accordingly
     noise_frac = max(x_noise, y_noise)
     noise = np.random.normal(0, noise_frac * max_noise)
 
     return(noise)
 
-
 # get model info from configuration file
 def get_config_info(config, model_name):
+    # setup config dictionary
     model_params = {}
 
+    # read in data from config file
     model_params['file_name'] = config[model_name]['file_name']
     model_params['model_name'] = config[model_name]['model_name']
     model_params['model_loc'] = config[model_name]['model_loc']

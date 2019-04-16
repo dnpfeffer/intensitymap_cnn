@@ -3,6 +3,9 @@
 from tensorflow import keras
 from tensorflow.keras import layers, models
 
+# Most of these are old and don't matter at only
+# only the top few are really used
+
 ##########################################################################
 ### Res_NeXt #############################################################
 ##########################################################################

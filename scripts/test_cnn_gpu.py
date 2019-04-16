@@ -1,3 +1,4 @@
+# old test trying to get tensorflow and CNNs to work on a gpu
 #########################
 ### Base Imports
 #########################

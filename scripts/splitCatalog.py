@@ -156,6 +156,7 @@ def main(rotate_theta=0):
     for f in onlyfiles:
         split_catalogue('../catalogues/' + f, rotate_theta, verbose=True)
 
+# splits dark matter halo catalogs in ../catalogues into smaller ones
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         main(int(sys.argv[1]))
