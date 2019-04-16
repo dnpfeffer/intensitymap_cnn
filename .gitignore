@@ -14,8 +14,21 @@
 *.gz
 *.fdb_latexmk
 
-### Ignore A thing Dan uses for FTP
+### Directories for maps, catalogs and models
+maps*
+catalogues*
+models*
+
+### A thing Dan uses for FTP
 ftp_scripts/*
+marcc_ftp_scripts/*
+
+### Directories for paper things
+paper_figures/*
+
+### Sublime project files
+intensity_mapping.sublime-project
+intensity_mapping.sublime-workspace
 
 # OS generated files #
 ######################
