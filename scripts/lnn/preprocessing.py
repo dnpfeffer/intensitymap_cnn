@@ -90,8 +90,6 @@ class ModelParams:
         self.noise_limits = (None,None)
         self.random_foreground = False
 
-        return()
-
     # setup command line parser arguments
     def setup_parser(self, parser):
         # add all of the arguments for command line parsing
