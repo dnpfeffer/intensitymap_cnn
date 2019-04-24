@@ -92,8 +92,6 @@ class ModelParams:
         self.random_foreground = False
         self.gaussian_filter = 0
 
-        return()
-
     # setup command line parser arguments
     def setup_parser(self, parser):
         # add all of the arguments for command line parsing

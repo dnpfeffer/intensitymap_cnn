@@ -580,7 +580,7 @@ def interpolate_power_data(lum, phi, min_val, max_val):
 def load_lums(base, lumLogBinCents):
     lums = np.zeros([len(base), len(lumLogBinCents)])
     for i, b in enumerate(base):
-        lums[i] = lnn.loadData(b + '_lum.npz')['lumFunc']
+        lums[i] = loadData(b + '_lum.npz')['lumFunc']
 
     return(lums)
 
@@ -747,8 +747,9 @@ def plot_outside_contour(ax, conf_interval, lumLogBinCents, label, alpha=0.25, c
 
 # plot the 95% confidence interval of the relative error for given CNN tests
 def plot_res_contour_full(res_list, lumLogBinCents, alpha=0.25, colors=None, lum_points=False,
-    plot_range=None, figsize=(18,9)):
-    fig, ax = plt.subplots(figsize=figsize)
+    plot_range=None, figsize=(18,9), ax=None, lum_point_size=100):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
 
     # use a specific color if given
     for i, res_pred in enumerate(res_list):
@@ -762,7 +763,7 @@ def plot_res_contour_full(res_list, lumLogBinCents, alpha=0.25, colors=None, lum
 
     # asked also plot the luminosity points considered with red '+'
     if lum_points:
-        ax.scatter(lumLogBinCents, [0]*len(lumLogBinCents), s=100, marker='+', zorder=10, color='r',
+        ax.scatter(lumLogBinCents, [0]*len(lumLogBinCents), s=lum_point_size, marker='+', zorder=10, color='r',
                    label='Used Luminosity Points')
 
     # set the y-lim with the default or as given
