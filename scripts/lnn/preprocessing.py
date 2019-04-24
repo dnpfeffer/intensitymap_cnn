@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import sys
 import time
+from scipy.ndimage import gaussian_filter
 
 from skimage.measure import block_reduce
 
@@ -89,6 +90,7 @@ class ModelParams:
         self.noise_upper = None
         self.noise_limits = (None,None)
         self.random_foreground = False
+        self.gaussian_filter = 0
 
         return()
 
@@ -165,6 +167,10 @@ class ModelParams:
                             help='Upper limit of noise to consider in units of (micro K).  Must be used with --noise_lower, not usable with --make_map_noisy.')
         parser.add_argument('-rf', '--random_foreground', type=self.str2bool,
                             default=self.random_foreground, help='If foregrounds should be random or not')
+        parser.add_argument('-gf', '--gaussian_filter', type=float,
+                            default=self.gaussian_filter,
+                            help='Pixel size of gaussian filter')
+
 
         return()
 
@@ -202,6 +208,7 @@ class ModelParams:
         self.noise_lower = args.noise_lower
         self.noise_upper = args.noise_upper
         self.random_foreground = args.random_foreground
+        self.gaussian_filter = args.gaussian_filter
 
         return()
 
@@ -474,6 +481,13 @@ def make_dateset(model_params, base):
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
+    if model_params.gaussian_smoothing > 0:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(apply_gaussian_smoothing_lum_wrapper, [x,
+                                                                y,
+                                                                model_params.gaussian_smoothing],
+                                                                [tf.float64, tf.float64])))
+
     # repeat dataset when it goes through all maps
     dataset = dataset.repeat()
     # set the batch size to what was given in ModelParams
@@ -573,6 +587,26 @@ def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z, chance_t
 def add_noise_after_pool_lum_wrapper(mapData, luminosity, make_map_noisy, pre_pool, pre_pool_z, chance_to_not=0.0):
     mapData = add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z,
         chance_to_not=chance_to_not)
+
+    return(mapData, luminosity)
+
+# function to apply guassian smoothing to a map
+def apply_gaussian_smoothing(mapData, gaussian_smoothing_sigma):
+    # handle 3d and 2d maps correctly for the filter
+    if len(mapData.shape) == 4:
+        sigma = (gaussian_smoothing_sigma,gaussian_smoothing_sigma,0,0)
+    else:
+        sigma = (gaussian_smoothing_sigma,gaussian_smoothing_sigma,0)
+
+    # apply guassian_filter over map
+    result = gaussian_filter(mapData, sigma=sigma, truncate=1)
+
+    return(result)
+
+# function to apply guassian smoothing to a map
+# wraps around function that doesn't take the luminosity data
+def apply_gaussian_smoothing_lum_wrapper(mapData, luminosity, gaussian_smoothing_sigma):
+    mapData = apply_gaussian_smoothing(mapData, gaussian_smoothing_sigma)
 
     return(mapData, luminosity)
 
@@ -891,6 +925,7 @@ def get_config_info(config, model_name):
     model_params['make_map_noisy2'] = float(config[model_name]['make_map_noisy2'])
     model_params['add_foregrounds'] = config[model_name].getboolean('add_foregrounds')
     model_params['random_foreground_params'] = config[model_name].getboolean('random_foreground_params')
+    model_params['gaussian_filter'] = float(config[model_name]['gaussian_filter'])
 
     # manage if random noise is requested
     if model_params['make_map_noisy2'] != 0:

@@ -117,6 +117,10 @@ for model_name in models:
                 model_params['pre_pool'], model_params['pre_pool_z'],
                 noise_fraction=1.0/22, max_noise=100)
 
+        # do gaussian smoothing
+        if model_params['gaussian_smoothing'] > 0:
+            cur_map = lnn.apply_gaussian_smoothing(cur_map, model_params['gaussian_smoothing'])
+
         # don't try looking at things with under 500 sources at 10^6 L_sun
         if model_params['only_bright']:
             if cur_lum[36] < np.log10(5*10**2):
