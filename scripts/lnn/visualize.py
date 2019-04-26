@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 from scipy.interpolate import interp1d
+from scipy.ndimage import gaussian_filter
 
 from .ioFuncs import *
 from .preprocessing import *
@@ -81,7 +82,8 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 # get the predicted and simulated luminosity function byproduct for a given model and map
 def test_model(model, base, base_number, luminosity_byproduct='log', threeD=False, evaluate=True,
     log_input=False, make_map_noisy=0, pre_pool=1, pre_pool_z=25, lum_func_size=None,
-    add_foregrounds=False, random_foreground_params=False, rotate=0):
+    add_foregrounds=False, random_foreground_params=False, rotate=0,
+    gaussian_smoothing=0):
 
     # get the simulated map and luminosity byproduct
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
@@ -120,6 +122,10 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
 
         cur_map = add_foreground_noise(cur_map, model_params.pix_x, model_params.pix_y, model_params.omega_pix,
                                 model_params.nu, pre_pool_z, random_foreground_params=random_foreground_params)
+
+    # apply gaussian smoothing
+    if gaussian_smoothing > 0:
+        cur_map = apply_gaussian_smoothing(cur_map, gaussian_smoothing)
 
     if lum_func_size is not None:
         if lum_func_size >= 1:
@@ -777,11 +783,3 @@ def plot_res_contour_full(res_list, lumLogBinCents, alpha=0.25, colors=None, lum
     ax.set_xlabel('L (L_sun)')
 
     return(ax)
-
-
-
-
-
-
-
-
