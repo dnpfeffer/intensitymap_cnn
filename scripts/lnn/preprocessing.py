@@ -90,7 +90,7 @@ class ModelParams:
         self.noise_upper = None
         self.noise_limits = (None,None)
         self.random_foreground = False
-        self.gaussian_filter = 0
+        self.gaussian_smoothing = 0
 
     # setup command line parser arguments
     def setup_parser(self, parser):
@@ -165,9 +165,9 @@ class ModelParams:
                             help='Upper limit of noise to consider in units of (micro K).  Must be used with --noise_lower, not usable with --make_map_noisy.')
         parser.add_argument('-rf', '--random_foreground', type=self.str2bool,
                             default=self.random_foreground, help='If foregrounds should be random or not')
-        parser.add_argument('-gf', '--gaussian_filter', type=float,
-                            default=self.gaussian_filter,
-                            help='Pixel size of gaussian filter')
+        parser.add_argument('-gs', '--gaussian_smoothing', type=float,
+                            default=self.gaussian_smoothing,
+                            help='Pixel size of gaussian smoothing')
 
 
         return()
@@ -206,7 +206,7 @@ class ModelParams:
         self.noise_lower = args.noise_lower
         self.noise_upper = args.noise_upper
         self.random_foreground = args.random_foreground
-        self.gaussian_filter = args.gaussian_filter
+        self.gaussian_smoothing = args.gaussian_smoothing
 
         return()
 
@@ -923,7 +923,9 @@ def get_config_info(config, model_name):
     model_params['make_map_noisy2'] = float(config[model_name]['make_map_noisy2'])
     model_params['add_foregrounds'] = config[model_name].getboolean('add_foregrounds')
     model_params['random_foreground_params'] = config[model_name].getboolean('random_foreground_params')
-    model_params['gaussian_filter'] = float(config[model_name]['gaussian_filter'])
+    model_params['geometric_noise'] = config[model_name].getboolean('geometric_noise')
+    model_params['only_bright'] = config[model_name].getboolean('only_bright')
+    model_params['gaussian_smoothing'] = float(config[model_name]['gaussian_smoothing'])
 
     # manage if random noise is requested
     if model_params['make_map_noisy2'] != 0:
