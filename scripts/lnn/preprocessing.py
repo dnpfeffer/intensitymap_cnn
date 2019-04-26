@@ -590,14 +590,16 @@ def add_noise_after_pool_lum_wrapper(mapData, luminosity, make_map_noisy, pre_po
 
 # function to apply guassian smoothing to a map
 def apply_gaussian_smoothing(mapData, gaussian_smoothing_sigma):
+    fwhm = 2.355
+
     # handle 3d and 2d maps correctly for the filter
     if len(mapData.shape) == 4:
-        sigma = (gaussian_smoothing_sigma,gaussian_smoothing_sigma,0,0)
+        sigma = (gaussian_smoothing_sigma/fwhm,gaussian_smoothing_sigma/fwhm,0,0)
     else:
-        sigma = (gaussian_smoothing_sigma,gaussian_smoothing_sigma,0)
+        sigma = (gaussian_smoothing_sigma/fwhm,gaussian_smoothing_sigma/fwhm,0)
 
     # apply guassian_filter over map
-    result = gaussian_filter(mapData, sigma=sigma, truncate=1)
+    result = gaussian_filter(mapData, sigma=sigma)
 
     return(result)
 
@@ -804,7 +806,7 @@ def add_to_processed_map(old_map, new_map):
 # special function to take log of positive and negative values and still work
 # probably should use 1 instead of 1e-6 in the log and it wouldn't change anything
 def log_modulus(cur_map):
-    cur_map = np.sign(cur_map) * np.log10(np.abs(cur_map) + 1e-6)
+    cur_map = np.sign(cur_map) * np.log10(np.abs(cur_map) + 1)
 
     return(cur_map)
 
