@@ -812,7 +812,7 @@ def log_modulus(cur_map):
 
 # undoes the log_modulus function
 def undo_log_modulus(cur_map):
-    cur_map = np.sign(cur_map) * (np.power(10, np.abs(cur_map)) - 1e-6)
+    cur_map = np.sign(cur_map) * (np.power(10, np.abs(cur_map)) - 1)
 
     return(cur_map)
 
