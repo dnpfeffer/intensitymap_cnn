@@ -629,12 +629,20 @@ class Prediction:
         self.transformed_res_median = []
         self.transformed_res_conf_interval = []
 
+        self.res_median_small = []
+        self.res_conf_interval_small = []
+        self.transformed_res_median_small = []
+        self.transformed_res_conf_interval_small = []
+
         # calculate residual
         self.calculate_res()
         # calculate the mean and std of residual
         self.calculate_mean_std()
         # determine the 95% confidence interval of the test
-        self.calculate_confidence_interval()
+        self.res_conf_interval, self.res_median, self.transformed_res_conf_interval, self.transformed_res_median = self.calculate_confidence_interval()
+
+        # determine the 68% confidence interval of the test
+        self.res_conf_interval_small, self.res_median_small, self.transformed_res_conf_interval_small, self.transformed_res_median_small = self.calculate_confidence_interval(conf=0.68)
 
     # get the residuals (relative error) of the luminosity function of a test
     def calculate_res(self):
@@ -673,6 +681,11 @@ class Prediction:
 
     # confidence interval centered on median
     def calculate_confidence_interval(self, conf=0.95):
+        res_conf_interval = []
+        res_median = []
+        transformed_res_conf_interval = []
+        transformed_res_median = []
+
         # do calculation of confidence interval for normal (unlogged) data
         for i, key in enumerate(self.res_ratio[0]):
             # sort list of residuals for a given luminosity
@@ -686,11 +699,11 @@ class Prediction:
 
             # store values in attributes
             # keep track of lower limit and upper limit of confidence interval
-            self.res_conf_interval.append([sorted_res[remove_maps], sorted_res[-remove_maps]])
-            self.res_median.append(sorted_res[int(map_numb/2)])
+            res_conf_interval.append([sorted_res[remove_maps], sorted_res[-remove_maps]])
+            res_median.append(sorted_res[int(map_numb/2)])
 
-        self.res_conf_interval = np.array(self.res_conf_interval)
-        self.res_median = np.array(self.res_median)
+        res_conf_interval = np.array(res_conf_interval)
+        res_median = np.array(res_median)
 
         # do calculation of confidence interval for logged data
         for i, key in enumerate(self.transformed_res_ratio[0]):
@@ -703,19 +716,23 @@ class Prediction:
             map_numb = len(sorted_res)
             remove_maps = int(map_numb * (1-conf)/2)
 
-            self.transformed_res_conf_interval.append([sorted_res[remove_maps], sorted_res[-remove_maps]])
-            self.transformed_res_median.append(sorted_res[int(map_numb/2)])
+            transformed_res_conf_interval.append([sorted_res[remove_maps], sorted_res[-remove_maps]])
+            transformed_res_median.append(sorted_res[int(map_numb/2)])
 
-        self.transformed_res_conf_interval = np.array(self.transformed_res_conf_interval)
-        self.transformed_res_median = np.array(self.transformed_res_median)
+        transformed_res_conf_interval = np.array(transformed_res_conf_interval)
+        transformed_res_median = np.array(transformed_res_median)
 
-        return()
+        return(res_conf_interval, res_median,
+        transformed_res_conf_interval, transformed_res_median)
 
 # plot an indivual CNN test result 95% relative error confidence error on an axis
-def plot_res_contour(ax, res_pred, lumLogBinCents, alpha=0.25, color=None, label=None):
+def plot_res_contour(ax, res_pred, lumLogBinCents, alpha=0.25, color=None, label=None, conf=2):
 
     # put the confidence interval values in an error
-    conf_interval = np.array([res_pred.transformed_res_conf_interval[:,0], res_pred.transformed_res_conf_interval[:,1]])
+    if conf == 1:
+        conf_interval = np.array([res_pred.transformed_res_conf_interval_small[:,0], res_pred.transformed_res_conf_interval_small[:,1]])
+    else:
+        conf_interval = np.array([res_pred.transformed_res_conf_interval[:,0], res_pred.transformed_res_conf_interval[:,1]])
 
     # make sure there is a label to use
     if label is None:
@@ -753,7 +770,7 @@ def plot_outside_contour(ax, conf_interval, lumLogBinCents, label, alpha=0.25, c
 
 # plot the 95% confidence interval of the relative error for given CNN tests
 def plot_res_contour_full(res_list, lumLogBinCents, alpha=0.25, colors=None, lum_points=False,
-    plot_range=None, figsize=(18,9), ax=None, lum_point_size=100):
+    plot_range=None, figsize=(18,9), ax=None, lum_point_size=100, conf=2):
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
 
@@ -765,7 +782,7 @@ def plot_res_contour_full(res_list, lumLogBinCents, alpha=0.25, colors=None, lum
             color = None
 
         # plot specific contour on axis for a given test
-        plot_res_contour(ax, res_pred, lumLogBinCents, alpha=alpha, color=color)
+        plot_res_contour(ax, res_pred, lumLogBinCents, alpha=alpha, color=color, conf=conf)
 
     # asked also plot the luminosity points considered with red '+'
     if lum_points:
