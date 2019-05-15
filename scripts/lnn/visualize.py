@@ -17,18 +17,22 @@ from tensorflow import keras as k
 ##########################################
 
 # plot_single_history
-def plot_single_history(history, start_loc=1, do_val=True):
+def plot_single_history(history, start_loc=1, do_val=True, second_color=None):
     fig, ax = plt.subplots(figsize=(9, 6))
     # fig, ax = plt.subplots()
 
     key = 'loss'
     # color = 'k'
     p = ax.semilogy(range(len(history[key]))[start_loc:], history[key][start_loc:],
-    label='Training')
+    label='Training', linewidth=2.5)
     if do_val:
-        color = p[-1].get_color()
+        if second_color is None:
+            color = p[-1].get_color()
+        else:
+            color = second_color
         ax.semilogy(range(len(history['val_' + key]))[start_loc:],
-        history['val_' + key][start_loc:], ls='--', label='Validation', color=color)
+        history['val_' + key][start_loc:], ls='--', label='Validation', color=color,
+        linewidth=1.5)
 
     ### display the plot
     ax.set_xlabel('Epoch')
