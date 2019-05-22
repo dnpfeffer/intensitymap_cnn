@@ -154,7 +154,7 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
     return(model)
 
 ##########################################################################
-### Res_NeXt2 #############################################################
+### Res_NeXt2 ############################################################
 ##########################################################################
 ### lots of this taken from https://gist.github.com/mjdietzx/0cb95922aac14d446a6530f87b3a04ce
 def get_master_res_next2(model_params, extra_file_name='',
@@ -181,142 +181,187 @@ def get_master_res_next2(model_params, extra_file_name='',
                 loss=model_params.loss,
                 use_bias=model_params.use_bias)
 
-    # def residual_network(x):
-    #     def add_common_layers(y):
-    #         y = layers.BatchNormalization(momentum=batchNorm_momentum)(y)
-    #         y = layers.LeakyReLU()(y)
+    return(model)
 
-    #         return(y)
+##########################################################################
+### Res_NeXt_small #######################################################
+##########################################################################
+### lots of this taken from https://gist.github.com/mjdietzx/0cb95922aac14d446a6530f87b3a04ce
+def get_master_res_next_small(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
+                extra_file_name='', file_name='log_lum_6_layer_model',
+                train_number=0, droprate=0.3, base_filters=128, cardinality=1,
+                batchNorm_momentum=0.99, dense_layer=1000,
+                give_weights=False, loss=keras.losses.logcosh, use_bias=True):
 
-    #     def grouped_convolution(y, nb_channels, _strides, use_bias=False):
-    #         # when `cardinality` == 1 this is just a standard convolution
-    #         if cardinality == 1:
-    #             return layers.Conv3D(nb_channels, kernel_size=(3, 3, 3), strides=_strides,
-    #                 padding='same', use_bias=use_bias)(y)
+    def residual_network(x):
+        def add_common_layers(y):
+            y = layers.BatchNormalization(momentum=batchNorm_momentum)(y)
+            y = layers.LeakyReLU()(y)
 
-    #         assert not nb_channels % cardinality
-    #         _d = nb_channels // cardinality
+            return(y)
 
-    #         # in a grouped convolution layer, input and output channels are divided into `cardinality` groups,
-    #         # and convolutions are separately performed within each group
-    #         groups = []
-    #         for j in range(cardinality):
-    #             group = layers.Lambda(lambda z: z[:, :, :, j * _d:j * _d + _d])(y)
-    #             groups.append(layers.Conv3D(_d, kernel_size=(3, 3, 3), strides=_strides, padding='same')(group))
+        def grouped_convolution(y, nb_channels, _strides, use_bias=False):
+            # when `cardinality` == 1 this is just a standard convolution
+            if cardinality == 1:
+                return layers.Conv3D(nb_channels, kernel_size=(3, 3, 3), strides=_strides,
+                    padding='same', use_bias=use_bias)(y)
 
-    #         # the grouped convolutional layer concatenates them as the outputs of the layer
-    #         y = layers.concatenate(groups)
+            assert not nb_channels % cardinality
+            _d = nb_channels // cardinality
 
-    #         return y
+            # in a grouped convolution layer, input and output channels are divided into `cardinality` groups,
+            # and convolutions are separately performed within each group
+            groups = []
+            for j in range(cardinality):
+                group = layers.Lambda(lambda z: z[:, :, :, j * _d:j * _d + _d])(y)
+                groups.append(layers.Conv3D(_d, kernel_size=(3, 3, 3), strides=_strides, padding='same')(group))
 
-    #     def residual_block(y, nb_channels_in, nb_channels_out, _strides=(1, 1, 1), _project_shortcut=False, use_bias=False):
-    #         """
-    #         Our network consists of a stack of residual blocks. These blocks have the same topology,
-    #         and are subject to two simple rules:
-    #         - If producing spatial maps of the same size, the blocks share the same hyper-parameters (width and filter sizes).
-    #         - Each time the spatial map is down-sampled by a factor of 2, the width of the blocks is multiplied by a factor of 2.
-    #         """
-    #         shortcut = y
+            # the grouped convolutional layer concatenates them as the outputs of the layer
+            y = layers.concatenate(groups)
 
-    #         # we modify the residual building block as a bottleneck design to make the network more economical
-    #         y = layers.Conv3D(nb_channels_in, kernel_size=(1, 1, 1), strides=(1, 1, 1), padding='same')(y)
-    #         y = add_common_layers(y)
+            return y
 
-    #         # ResNeXt (identical to ResNet when `cardinality` == 1)
-    #         y = grouped_convolution(y, nb_channels_in, _strides=_strides, use_bias=use_bias)
-    #         y = add_common_layers(y)
+        def residual_block(y, nb_channels_in, nb_channels_out, _strides=(1, 1, 1), _project_shortcut=False, use_bias=False):
+            """
+            Our network consists of a stack of residual blocks. These blocks have the same topology,
+            and are subject to two simple rules:
+            - If producing spatial maps of the same size, the blocks share the same hyper-parameters (width and filter sizes).
+            - Each time the spatial map is down-sampled by a factor of 2, the width of the blocks is multiplied by a factor of 2.
+            """
+            shortcut = y
 
-    #         y = layers.Conv3D(nb_channels_out, kernel_size=(1, 1, 1), strides=(1, 1, 1), padding='same')(y)
-    #         # batch normalization is employed after aggregating the transformations and before adding to the shortcut
-    #         y = layers.BatchNormalization(momentum=batchNorm_momentum)(y)
+            # we modify the residual building block as a bottleneck design to make the network more economical
+            y = layers.Conv3D(nb_channels_in, kernel_size=(1, 1, 1), strides=(1, 1, 1), padding='same')(y)
+            y = add_common_layers(y)
 
-    #         # identity shortcuts used directly when the input and output are of the same dimensions
-    #         if _project_shortcut or _strides != (1, 1, 1):
-    #             # when the dimensions increase projection shortcut is used to match dimensions (done by 1×1 convolutions)
-    #             # when the shortcuts go across feature maps of two sizes, they are performed with a stride of 2
-    #             shortcut = layers.Conv3D(nb_channels_out, kernel_size=(1, 1, 1), strides=_strides, padding='same')(shortcut)
-    #             shortcut = layers.BatchNormalization(momentum=batchNorm_momentum)(shortcut)
+            # ResNeXt (identical to ResNet when `cardinality` == 1)
+            y = grouped_convolution(y, nb_channels_in, _strides=_strides, use_bias=use_bias)
+            y = add_common_layers(y)
 
-    #         y = layers.add([shortcut, y])
+            y = layers.Conv3D(nb_channels_out, kernel_size=(1, 1, 1), strides=(1, 1, 1), padding='same')(y)
+            # batch normalization is employed after aggregating the transformations and before adding to the shortcut
+            y = layers.BatchNormalization(momentum=batchNorm_momentum)(y)
 
-    #         # relu is performed right after each batch normalization,
-    #         # expect for the output of the block where relu is performed after the adding to the shortcut
-    #         y = layers.LeakyReLU()(y)
+            # identity shortcuts used directly when the input and output are of the same dimensions
+            if _project_shortcut or _strides != (1, 1, 1):
+                # when the dimensions increase projection shortcut is used to match dimensions (done by 1×1 convolutions)
+                # when the shortcuts go across feature maps of two sizes, they are performed with a stride of 2
+                shortcut = layers.Conv3D(nb_channels_out, kernel_size=(1, 1, 1), strides=_strides, padding='same')(shortcut)
+                shortcut = layers.BatchNormalization(momentum=batchNorm_momentum)(shortcut)
 
-    #         return y
+            y = layers.add([shortcut, y])
 
-    #     # conv1
-    #     x = layers.Conv3D(model_params.base_filters, kernel_size=(7, 7, 7), strides=(2, 2, 2),
-    #         padding='same', use_bias=model_params.use_bias)(x)
-    #     x = add_common_layers(x)
+            # relu is performed right after each batch normalization,
+            # expect for the output of the block where relu is performed after the adding to the shortcut
+            y = layers.LeakyReLU()(y)
 
-    #     # conv2
-    #     x = layers.MaxPool3D(pool_size=(3, 3, 3), strides=(2, 2, 2), padding='same')(x)
-    #     for i in range(3):
-    #         project_shortcut = True if i == 0 else False
-    #         x = residual_block(x, model_params.base_filters*2**1, model_params.base_filters*2**1,
-    #             _project_shortcut=project_shortcut,
-    #             use_bias=model_params.use_bias)
+            return y
 
-    #     # conv3
-    #     for i in range(4):
-    #         # down-sampling is performed by conv3_1, conv4_1, and conv5_1 with a stride of 2
-    #         strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-    #         x = residual_block(x, model_params.base_filters*2**2, model_params.base_filters*2**2,
-    #             _strides=strides,
-    #             use_bias=model_params.use_bias)
+        # conv1
+        x = layers.Conv3D(base_filters, kernel_size=(7, 7, 7), strides=(2, 2, 2),
+            padding='same', use_bias=use_bias)(x)
+        x = add_common_layers(x)
 
-    #     # conv4
-    #     for i in range(6):
-    #         strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-    #         x = residual_block(x, model_params.base_filters*2**3, model_params.base_filters*2**3,
-    #             _strides=strides,
-    #             use_bias=model_params.use_bias)
+        # conv2
+        x = layers.MaxPool3D(pool_size=(3, 3, 3), strides=(2, 2, 2), padding='same')(x)
+        for i in range(3):
+            project_shortcut = True if i == 0 else False
+            x = residual_block(x, base_filters*2**0, base_filters*2**1,
+                _project_shortcut=project_shortcut,
+                use_bias=use_bias)
 
-    #     # conv5
-    #     for i in range(3):
-    #        strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-    #        x = residual_block(x, model_params.base_filters*2**4, model_params.base_filters*2**4,
-    #         _strides=strides,
-    #         use_bias=model_params.use_bias)
+        # conv3
+        for i in range(4):
+            # down-sampling is performed by conv3_1, conv4_1, and conv5_1 with a stride of 2
+            strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+            x = residual_block(x, base_filters*2**1, base_filters*2**2,
+                _strides=strides,
+                use_bias=use_bias)
 
-    #     x = layers.GlobalAveragePooling3D()(x)
-    #     x = layers.Dense(model_params.dense_layer)(x)
-    #     x = layers.BatchNormalization(momentum=batchNorm_momentum)(x)
-    #     x = layers.ReLU()(x)
-    #     x = layers.Dropout(model_params.droprate)(x)
-    #     x = layers.Dense(model_params.lum_func_size)(x)
+        # # conv4
+        # for i in range(6):
+        #     strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+        #     x = residual_block(x, base_filters*2**2, base_filters*2**3,
+        #         _strides=strides,
+        #         use_bias=use_bias)
+        #
+        # # conv5
+        # for i in range(3):
+        #    strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+        #    x = residual_block(x, base_filters*2**3, base_filters*2**4,
+        #     _strides=strides,
+        #     use_bias=use_bias)
 
-    #     return(x)
+        x = layers.GlobalAveragePooling3D()(x)
+        x = layers.Dense(dense_layer)(x)
+        x = layers.BatchNormalization(momentum=batchNorm_momentum)(x)
+        x = layers.ReLU()(x)
+        x = layers.Dropout(droprate)(x)
+        x = layers.Dense(lum_func_size)(x)
 
-    # ### get the weights file name
-    # if give_weights:
-    #     weight_file_name = model_params.modelLoc + model_params.file_name + extra_file_name + '_weights'
-    #     if model_params.train_number > 0:
-    #         weight_file_name += '_{0}'.format(int(model_params.train_number))
-    #     weight_file_name += '.hdf5'
+        return(x)
+
+    ### get the weights file name
+    if give_weights:
+        weight_file_name = modelLoc + file_name + extra_file_name + '_weights'
+        if train_number > 0:
+            weight_file_name += '_{0}'.format(int(train_number))
+        weight_file_name += '.hdf5'
 
 
-    # image_tensor = layers.Input(shape=(model_params.pix_x, model_params.pix_y, model_params.numb_maps, 1))
-    # network_output = residual_network(image_tensor)
-    # model = models.Model(inputs=[image_tensor], outputs=[network_output])
+    image_tensor = layers.Input(shape=(pix_x, pix_y, numb_maps, 1))
+    network_output = residual_network(image_tensor)
+    model = models.Model(inputs=[image_tensor], outputs=[network_output])
 
 
-    # model.compile(loss=model_params.loss,
-    #                      optimizer=keras.optimizers.Adam(),
-    #                      metrics=[keras.metrics.mse])
+    model.compile(loss=loss,
+                         optimizer=keras.optimizers.Adam(),
+                         metrics=[keras.metrics.mse])
 
-    # if give_weights:
-    #     model.load_weights(weight_file_name)
+    if give_weights:
+        model.load_weights(weight_file_name)
 
-    #     model.compile(loss=model_params.loss,
-    #                      optimizer=keras.optimizers.Adam(),
-    #                      metrics=[keras.metrics.mse])
+        model.compile(loss=loss,
+                         optimizer=keras.optimizers.Adam(),
+                         metrics=[keras.metrics.mse])
 
     # print(weight_file_name)
     # master.summary()
 
     return(model)
+
+##########################################################################
+### Res_NeXt2_small ######################################################
+##########################################################################
+### lots of this taken from https://gist.github.com/mjdietzx/0cb95922aac14d446a6530f87b3a04ce
+def get_master_res_next2_small(model_params, extra_file_name='',
+                    give_weights=False, cardinality=1):
+
+    # if hasattr(model_params, 'file_name'):
+    try:
+        file_name = model_params.file_name
+    # else:
+    except AttributeError:
+        file_name = ''
+
+    model = get_master_res_next_small(model_params.modelLoc, model_params.pix_x,
+                model_params.pix_y, model_params.numb_maps, model_params.lum_func_size,
+                extra_file_name=extra_file_name,
+                file_name=file_name ,
+                train_number=model_params.train_number,
+                droprate=model_params.droprate,
+                base_filters=model_params.base_filters,
+                cardinality=cardinality,
+                batchNorm_momentum=model_params.batchNorm_momentum,
+                dense_layer=model_params.dense_layer,
+                give_weights=give_weights,
+                loss=model_params.loss,
+                use_bias=model_params.use_bias)
+
+    return(model)
+
+
+
 
 ##########################################################################
 ### master ###############################################################

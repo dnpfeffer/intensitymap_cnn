@@ -186,19 +186,23 @@ def getParams(haloCat, mapFile, model='Li', coeffs=None, **kwargs):
     return(params)
 
 # function to make a random map given a selection of catalogs, the catalog location and the location to store the map
-def make_random_map(catalogs, haloLoc, mapLoc, default=False, noise=0):
+def make_random_map(catalogs, haloLoc, mapLoc, default=False, noise=0,
+    npix_x=None, npix_y=None, nmaps=None):
     # choose a random catalog
     catalog = random.choice(catalogs)
     # make the random map
-    make_random_map_from_cat(catalog, haloLoc, mapLoc, default=default, noise=noise)
+    make_random_map_from_cat(catalog, haloLoc, mapLoc, default=default, noise=noise,
+        npix_x=npix_x, npix_y=npix_y, nmaps=nmaps)
 
     return()
 
 # function to make a random map given a specific catalog, catalog location and location to store the map
-def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False, noise=0):
+def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False,
+    noise=0, npix_x=None, npix_y=None, nmaps=None):
     # make a random paramDict
     paramDict = {}
-    paramDict = make_paramDict(paramDict=paramDict, model=model, default=default)
+    paramDict = make_paramDict(paramDict=paramDict, model=model, default=default,
+        npix_x=npix_x, npix_y=npix_y, nmaps=nmaps)
 
     # make sure the map directory exists
     checkDirectoryPath(mapLoc)
@@ -216,9 +220,11 @@ def make_random_map_from_cat(catalog, haloLoc, mapLoc, model=None, default=False
 
 # function to make a random paramDict for a limlam_mocker run
 # randomizes the model and the values of the coefficients in the model if requested
-def make_paramDict(paramDict, model=None, default=False):
+def make_paramDict(paramDict, model=None, default=False,
+    npix_x=None, npix_y=None, nmaps=None):
     # list of models
-    model_list = ['Li', 'Padmanabhan', 'Breysse']
+    # model_list = ['Li', 'Padmanabhan', 'Breysse']
+    model_list = ['Li', 'Padmanabhan']
     means = []
     sig = []
 
@@ -274,6 +280,14 @@ def make_paramDict(paramDict, model=None, default=False):
 
     # set coeffs parameter for limlam
     paramDict['coeffs'] = coeffs
+
+    # see about changing the default number of pixels or maps used
+    if npix_x is not None:
+        paramDict['npix_x'] = npix_x
+    if npix_y is not None:
+        paramDict['npix_y'] = npix_y
+    if nmaps is not None:
+        paramDict['nmaps'] = nmaps
 
     return(paramDict)
 

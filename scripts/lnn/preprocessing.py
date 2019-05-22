@@ -502,7 +502,7 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
     return(mapData, lumData)
 
 # function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
-def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
+def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False, 
     make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
 
     # be careful with strings sometime not being strings and needing to decode them
@@ -673,7 +673,8 @@ def add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_n
         foreground = makeFGcube(int(Nx), int(Ny), omega_pix, nu, random_foreground_params=random_foreground_params)
 
         # reduce map in z direction
-        foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
+        if pre_pool_z > 1:
+            foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
         foreground = foreground.reshape(mapData.shape)
 
         # add foreground to current map
