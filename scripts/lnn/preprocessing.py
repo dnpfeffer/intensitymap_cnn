@@ -502,7 +502,7 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
     return(mapData, lumData)
 
 # function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
-def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False, 
+def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
     make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
 
     # be careful with strings sometime not being strings and needing to decode them
@@ -797,8 +797,6 @@ def log_map(cur_map):
 
 # function to add a map to a post-processed map
 def add_to_processed_map(old_map, new_map):
-    # old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
-    # old_map = np.log10(np.power(10, old_map+3) + new_map) - 3
 
     old_map = log_modulus(undo_log_modulus(old_map) + new_map)
 
