@@ -105,12 +105,6 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
             # I feel like I put this here for a reason...
             pass
 
-    if log_input:
-        # cur_map = np.log10(cur_map + 1e-6)
-        # cur_map -= (-6)
-        # cur_map = log_map(cur_map)
-        cur_map = log_modulus(cur_map)
-
     # add gaussian noise
     if isinstance(make_map_noisy, (tuple, list, np.ndarray)):
         cur_map = add_noise_after_pool(cur_map, make_map_noisy, pre_pool, pre_pool_z)
@@ -130,6 +124,9 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
     # apply gaussian smoothing
     if gaussian_smoothing > 0:
         cur_map = apply_gaussian_smoothing(cur_map, gaussian_smoothing)
+
+    if log_input:
+        cur_map = log_modulus(cur_map)
 
     if lum_func_size is not None:
         if lum_func_size >= 1:
@@ -165,209 +162,6 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
 
     # return the simulated luminosity byproduct and the one from the CNN
     return(cur_lum, cnn_lum, loss)
-
-# test a single model against multiple maps
-def test_model_multiple_times(model, base, luminosity_byproduct='log', threeD=False,
-    evaluate=True, log_input=False, make_map_noisy=0, base_numbers=[], test_size=10):
-
-    batch_size = 40
-
-    # if multiple base numbers are given then get that many base names to test
-    if len(base_numbers) > 0:
-        base = base[base_numbers]
-
-    # if the test_size is bigger then the number of bases being used then set the test size to that
-    if len(base) < test_size:
-        test_size = len(base)
-
-    # setup dataset used for testing
-    dataset = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(base))
-    dataset = dataset.shuffle(buffer_size=len(base))
-    dataset = dataset.map(lambda item: tuple(tf.py_func(utf8FileToMapAndLum, [item, luminosity_byproduct, threeD, log_input, make_map_noisy], [tf.float64, tf.float64])))
-    dataset = dataset.repeat()
-    dataset = dataset.batch(batch_size)
-
-    print(model.evaluate(dataset, steps=test_size, verbose=1))
-
-# plot the results of a single CNN and map
-def plot_model_test(cur_lum, cnn_lum, lumLogBinCents, y_label, lum_func_size=49):
-    # # get moving average of CNN result to make it look smoother
-    # window_size = 5
-    # window = np.ones(window_size)/float(window_size)
-    # avg = np.convolve(cnn_lum[0], window, 'same')
-
-    # plot the simulated and CNN data
-    plt.semilogx(lumLogBinCents[:lum_func_size], cnn_lum[0][:lum_func_size], label='CNN')
-    # plt.semilogx(lumLogBinCents[2:], avg[2:], label='Smoothed CNN')
-    plt.semilogx(lumLogBinCents[:lum_func_size], cur_lum[:lum_func_size], label='Simulated')
-    plt.legend()
-    plt.title('CNN Result')
-    plt.xlabel('L (L_sun)')
-
-    # handles axes correctly for the different byproducts
-    if y_label == 'basic':
-        plt.ylabel('dN/dL')
-    elif y_label == 'basicL':
-        plt.ylabel('dN/dL L')
-    elif y_label == 'log':
-        plt.ylabel('Log10(dN/dL)')
-    elif y_label == 'numberCt':
-        plt.ylabel('N')
-    else:
-        print('A bad y label was given, defaulting to basic')
-        plt.ylabel('dN/dL')
-
-    # show the plot
-    plt.show()
-
-    return()
-
-# plot the ratio of a CNN's result to the underlying simulation
-def plot_model_ratio(cur_lum, cnn_lum, lumLogBinCents, title, end_cut_off=1, lum_func_size=49):
-    # get moving average of CNN result to make it look smoother
-    # window_size = 5
-    # window = np.ones(window_size)/float(window_size)
-    # avg = np.convolve(cnn_lum[0], window, 'same')
-
-    # plot the ratio
-    ratio = cnn_lum[0][:lum_func_size]/cur_lum[:lum_func_size]
-    lumLogBinCents = lumLogBinCents[:lum_func_size]
-    # ratio_smooth = avg/cur_lum
-    plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label='CNN')
-    # plt.semilogx(lumLogBinCents[2:-(end_cut_off)], ratio_smooth[2:-(end_cut_off)], label='Smoothed CNN')
-
-    # handle the title correclty based on the byproduct used
-    if title == 'basic':
-        plt.title('Using dN/dL')
-    elif title == 'basicL':
-        plt.title('Using dN/dL L')
-    elif title == 'log':
-        plt.title('Using Log10(dN/dL)')
-    elif y_label == 'numberCt':
-        plt.title('Using N')
-    else:
-        print('A bad y label was given, defaulting to basic')
-        plt.title('Using dN/dL')
-
-    plt.ylabel('Predicted / Expected')
-    plt.xlabel('L (L_sun)')
-    plt.legend()
-
-    plt.ylim([0.8,1.2])
-
-    plt.show()
-
-    return()
-
-# plot multiple models together to compare them
-def compare_multiple_models(model_keys, models_dict, base, base_number, lumLogBinCents,
-    end_cut_off=1, evaluate=False, display='log', make_map_noisy=0):
-
-    # lists to hold future luminosity values
-    compare_lum = []
-    cnn_lums = []
-
-    print(display)
-
-    # choose which converting function to use
-    if display == 'log':
-        converter = convert_lum_to_log
-    elif display == 'basic':
-        converter = convert_lum_to_basic
-    elif display == 'numberCt':
-        converter = convert_lum_to_numberCt
-    else:
-        converter = convert_lum_to_log
-
-    # loop through each model and find the expected log luminosity function
-    for key in model_keys:
-        if evaluate:
-            print(key)
-
-        if 'log_in' in key:
-            log_input = True
-        else:
-            log_input = False
-
-        # test the model on the given map (base+base_number)
-        cur_lum, cnn_lum = test_model(models_dict[key]['model'], base, base_number,
-                                      luminosity_byproduct=models_dict[key]['luminosity_product'],
-                                     threeD=models_dict[key]['threeD'], evaluate=evaluate,
-                                     log_input=log_input, make_map_noisy=make_map_noisy)
-
-        # append results to list
-        cnn_lums.append(converter(cnn_lum[0], models_dict[key]['luminosity_product'], lumLogBinCents))
-
-        # get the underlying log luminosity function once
-        if len(compare_lum) == 0:
-            compare_lum = converter(cur_lum, models_dict[key]['luminosity_product'], lumLogBinCents)
-
-        # if requested to manual calculation of different loss metrics
-        if evaluate:
-            # print(cnn_lums[-1])
-            print(logcosh(compare_lum, cnn_lums[-1]))
-            print(logcosh_rel(compare_lum, cnn_lums[-1]))
-
-    # plot the raw values and ratio of values together
-    plot_multiple_models(compare_lum, cnn_lums, model_keys, lumLogBinCents, display=display)
-    plot_multiple_models_ratios(compare_lum, cnn_lums, model_keys, lumLogBinCents, end_cut_off)
-
-    return()
-
-# plot multiple models together to compare them
-def plot_multiple_models(compare_lum, cnn_lums, model_keys, lumLogBinCents, display='log'):
-    plt.figure(figsize=(12, 6))
-
-    # plot the underlying distribution
-    plt.semilogx(lumLogBinCents, compare_lum, label='Simulated')
-
-    # plot each individual model
-    for i in range(len(cnn_lums)):
-        plt.semilogx(lumLogBinCents, cnn_lums[i], label=model_keys[i])
-
-    # basic plot stuff
-    plt.legend()
-    plt.title('CNN Result')
-    plt.xlabel('L (L_sun)')
-
-    if display == 'log':
-        plt.ylabel('Log10(dN/dL)')
-        plt.ylim(0, 5)
-    if display == 'basic':
-        plt.ylabel('dN/dL')
-        # plt.ylim(0, 5)
-    elif display == 'numberCt':
-        plt.ylabel('Log10(N)')
-        plt.ylim(0, 6)
-    else:
-        plt.ylabel('Log10(dN/dL)')
-        plt.ylim(0, 5)
-    plt.show()
-
-    return()
-
-# plot mutliple model ratios together for comparisons
-def plot_multiple_models_ratios(compare_lum, cnn_lums, model_keys, lumLogBinCents, end_cut_off=1):
-    plt.figure(figsize=(12, 6))
-
-    # plot the ratio of 1
-    ratio = compare_lum/compare_lum
-    plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label='100%')
-
-    # plot the ratio for each model
-    for i in range(len(cnn_lums)):
-        ratio = cnn_lums[i]/compare_lum
-        plt.semilogx(lumLogBinCents[:-end_cut_off], ratio[:-end_cut_off], label=model_keys[i])
-
-    # basic plot stuff
-    plt.legend()
-    plt.title('Result')
-    plt.ylabel('Predicted / Expected')
-    plt.xlabel('L (L_sun)')
-    # plt.ylim(0.85, 1.05)
-    plt.show()
-
-    return()
 
 # convert the given luminosity byproduct to log luminosity function
 def convert_lum_to_log(lum, luminosity_product, lumLogBinCents):
@@ -532,33 +326,6 @@ def std_of_model(ratio_of_lums):
         stds_lower[i] = np.sqrt(std_lower/(len(ratio_of_lums[:,i])-1))
 
     return(stds_lower, stds_upper)
-
-# # function to plot rough 95% contour around perfect prediction for different models
-# def prediction_contour_plot(model_labels, model_lowers, model_uppers, model_lums, ratio_type='log', y_range=[0.7, 1.3], white_noise=0):
-#     plt.figure(figsize=(12, 6))
-
-#     plt.semilogx(model_lums[0], model_lowers[0]/model_lowers[0], label='100%')
-
-#     for i in range(len(model_labels)):
-#         plt.fill_between(model_lums[i], 1-2*model_lowers[i], 1+2*model_uppers[i], label=model_labels[i], alpha=0.15)
-
-#     if len(y_range) == 2:
-#         plt.ylim(y_range)
-#     plt.xscale('log')
-#     plt.xlabel('L (L_sun)')
-#     if ratio_type == 'log':
-#         plt.ylabel('Ratio of log10(dN/dL L)')
-#     elif ratio_type == 'full':
-#         plt.ylabel('Ratio of dN/dL L')
-#     else:
-#         plt.ylabel('Ratio of log10(dN/dL L)')
-#     title = 'Power Spectrum Determination of dN/dL L Ratios'
-#     if white_noise:
-#         title += ' with {0} \\mu K noise'.format(white_noise)
-#     plt.title(title)
-#     plt.legend()
-
-#     plt.show()
 
 ##########################################
 # Load Power Spectrum Results

@@ -479,12 +479,23 @@ def make_dateset(model_params, base):
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
+    # apply a guassian filter over the map if requested
+    # used for when pixels are smaller then the beam size
     if model_params.gaussian_smoothing > 0:
         dataset = dataset.map(lambda x, y:
                             tuple(tf.py_func(apply_gaussian_smoothing_lum_wrapper, [x,
                                                                 y,
                                                                 model_params.gaussian_smoothing],
                                                                 [tf.float64, tf.float64])))
+
+    # apply a log-modulus function to the map to make it span a single order of magnitude
+    # this has to be after smoothing, the real map would be smoothed before it can be logged
+    if model_params.log_input:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(log_modulus_wrapper, [x,
+                                                                y],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
 
     # repeat dataset when it goes through all maps
     dataset = dataset.repeat()
@@ -522,17 +533,6 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         else:
             pass
 
-    # use a log of some sorts to make the IM values span a single order of magnitude
-    if log_input:
-        # mapData = np.log10(mapData + 1e-6) + 6
-        # mapData = log_map(mapData + 1e3) - 3
-        mapData = log_modulus(mapData)
-
-    # mean_map = np.mean(mapData)
-    # std_map = np.std(mapData)
-
-    # mapData = (mapData - mean_map)/std_map
-
     # decide if you want to use all luminosity values or a subset of them
     if lum_func_size is not None:
         if lum_func_size >= 1:
@@ -562,21 +562,13 @@ def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z, chance_t
                 sys.exit("A noise list was given that has more then 2 values.  Please only give a scalar or a list with a min and max")
             else:
                 make_map_noisy = np.random.uniform(make_map_noisy[0], make_map_noisy[1])
-                # print(make_map_noisy)
-
-        # Old way of doing noise (incorrect because noise can be negative)
-        # # Use central limit theorem and get a single draw for the noise
-        # # assume 160 draws is enough and my math is correct to get new mean and variance
-        # new_mean = shrink_size / np.sqrt(2*np.pi) * make_map_noisy
-        # new_std = np.sqrt(shrink_size / 2 * make_map_noisy**2 * (1 - 1/np.pi))
-        # noise = np.maximum(np.random.normal(new_mean, new_std, mapData.shape), 0)
 
         # new way of doing noise (noise can be negative)
         new_std = np.sqrt(shrink_size) * make_map_noisy
         noise = np.random.normal(0, new_std, mapData.shape)
 
         # add the noise to the map correctly
-        mapData = add_to_processed_map(mapData, noise)
+        mapData = mapData + noise
 
     return(mapData)
 
@@ -678,7 +670,7 @@ def add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_n
         foreground = foreground.reshape(mapData.shape)
 
         # add foreground to current map
-        mapData = add_to_processed_map(mapData, foreground)
+        mapData = mapData + foreground
 
     return(mapData)
 
@@ -797,17 +789,21 @@ def log_map(cur_map):
 
 # function to add a map to a post-processed map
 def add_to_processed_map(old_map, new_map):
-
     old_map = log_modulus(undo_log_modulus(old_map) + new_map)
 
     return(old_map)
 
 # special function to take log of positive and negative values and still work
-# probably should use 1 instead of 1e-6 in the log and it wouldn't change anything
 def log_modulus(cur_map):
     cur_map = np.sign(cur_map) * np.log10(np.abs(cur_map) + 1)
 
     return(cur_map)
+
+# wrapper function for log_modulus used with dataset object
+def log_modulus_wrapper(cur_map, lumData):
+    cur_map = log_modulus(cur_map)
+
+    return(cur_map, lumData)
 
 # undoes the log_modulus function
 def undo_log_modulus(cur_map):
