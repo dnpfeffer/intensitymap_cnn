@@ -47,7 +47,7 @@ model2 = model_params.continue_training_check()
 model_params.set_loss(keras.losses)
 
 if model2 is None:
-    model2 = get_master_res_next2_small(model_params)
+    model2 = get_master_res_next_u_net2(model_params)
 
 # model2.summary()
 
@@ -59,7 +59,7 @@ callbacks_list = lnn.setup_checkpoints(model_params, keras.callbacks)
 ##########################
 # Start Training the network
 ##########################
-dataset, dataset_val = lnn.setup_datasets(model_params)
+dataset, dataset_val = lnn.setup_datasets(model_params, make_dataset=lnn.make_dataset_foregrounds)
 
 print('-------------------------')
 print(dataset)

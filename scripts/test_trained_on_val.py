@@ -121,6 +121,10 @@ for model_name in models:
         if model_params['gaussian_smoothing'] > 0:
             cur_map = lnn.apply_gaussian_smoothing(cur_map, model_params['gaussian_smoothing'])
 
+        # apply log_modulus to make map span single order of magnitude
+        if defaults['log_input']:
+            cur_map = lnn.log_modulus(cur_map)
+
         # don't try looking at things with under 500 sources at 10^6 L_sun
         if model_params['only_bright']:
             if cur_lum[36] < np.log10(5*10**2):
