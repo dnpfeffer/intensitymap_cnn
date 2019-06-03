@@ -17,5 +17,5 @@ The CNN is expected to take in a 64x64x10 modified LIM and to output 49 values t
 
 Below is a comparision of the CNN to a power spectrum / voxel intensity distrubtion method of determing the luminosity function.  The CNN does better at lower luminosities.
 
-![Network Prediction](figures/ihle_comparison.jpg)
+![Network Comparison](figures/Ihle_comparison.jpg)
 
