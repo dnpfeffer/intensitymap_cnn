@@ -108,12 +108,12 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 _strides=strides,
                 use_bias=use_bias)
 
-        # conv5
-        for i in range(3):
-           strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-           x = residual_block(x, base_filters*2**4, base_filters*2**5,
-            _strides=strides,
-            use_bias=use_bias)
+        # # conv5
+        # for i in range(3):
+        #    strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+        #    x = residual_block(x, base_filters*2**4, base_filters*2**5,
+        #     _strides=strides,
+        #     use_bias=use_bias)
 
         x = layers.GlobalAveragePooling3D()(x)
         x = layers.Dense(dense_layer)(x)
@@ -278,12 +278,12 @@ def get_master_res_next_small(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 _strides=strides,
                 use_bias=use_bias)
 
-        # conv4
-        for i in range(6):
-            strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-            x = residual_block(x, base_filters*2**2, base_filters*2**3,
-                _strides=strides,
-                use_bias=use_bias)
+        # # conv4
+        # for i in range(6):
+        #     strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+        #     x = residual_block(x, base_filters*2**2, base_filters*2**3,
+        #         _strides=strides,
+        #         use_bias=use_bias)
         #
         # # conv5
         # for i in range(3):
