@@ -5,13 +5,18 @@ import lnn as lnn
 
 ### set the location of the halo catalogs and maps
 haloLoc = '../catalogues2/'
-mapLoc = '../maps2/random_maps2/'
+mapLoc = '../maps2/random_small_Li_small_map/'
+
+# size of LIM to use
+npix_x = 64
+npix_y = 64
+nmaps = 100
 
 ### what noise level to use
 noise = 0
 
 ### to use base coefficients for the model or not
-default = True
+default = False
 
 ### make sure the map directory exists
 lnn.checkDirectoryPath(mapLoc)
@@ -24,7 +29,8 @@ numb_maps = 5796
 
 ### start making random maps
 for i in range(numb_maps):
-    lnn.make_random_map(subFields, haloLoc, mapLoc, default, noise=noise)
+    lnn.make_random_map(subFields, haloLoc, mapLoc, default, noise=noise,
+                    npix_x=npix_x, npix_y=npix_y, nmaps=nmaps)
 
     ### print every 100 maps where we are in the process
     if i%100 == 0:

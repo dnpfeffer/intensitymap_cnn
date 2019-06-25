@@ -168,6 +168,12 @@ class ModelParams:
         parser.add_argument('-gs', '--gaussian_smoothing', type=float,
                             default=self.gaussian_smoothing,
                             help='Pixel size of gaussian smoothing')
+        parser.add_argument('-px', '--pix_x', type=int, default=self.pix_x,
+                            help='Number of pixels in x-direction')
+        parser.add_argument('-py', '--pix_y', type=int, default=self.pix_y,
+                            help='Number of pixels in y-direction')
+        parser.add_argument('-nms', '--numb_maps', type=int, default=self.numb_maps,
+                            help='Number of maps used in a LIM')
 
 
         return()
@@ -207,6 +213,9 @@ class ModelParams:
         self.noise_upper = args.noise_upper
         self.random_foreground = args.random_foreground
         self.gaussian_smoothing = args.gaussian_smoothing
+        self.pix_x = args.pix_x
+        self.pix_y = args.pix_y
+        self.numb_maps = args.numb_maps
 
         return()
 
@@ -370,59 +379,12 @@ def setup_checkpoints(model_params, callbacks):
 
     return(callbacks_list)
 
-# load in data for training and package it for training
-def setup_datasets(model_params):
-    print('Starting to load data...')
-    subFields = loadBaseFNames(model_params.mapLoc)
-
-    # set random seed so data is shuffeled the same way
-    # every time and then make the seed random
-    np.random.seed(1234)
-    np.random.shuffle(subFields)
-    np.random.seed()
-
-    # shuffle test and validation data
-    valPoint = int(len(subFields) * (1 - model_params.valPer))
-
-    # base file names for training data
-    base = [model_params.mapLoc + s for s in subFields[:valPoint]]
-
-    # only load a certain number of files if requested
-    if model_params.train_number > 0:
-        base = base[:model_params.train_number]
-
-    # base file names for validation data
-    base_val = [model_params.mapLoc + s for s in subFields[valPoint:]]
-
-    # shuffle the order of the maps
-    np.random.shuffle(base)
-    np.random.shuffle(base_val)
-
-    # put map information into our ModelParams object
-    model_params.get_map_info(base[0] + '_map.npz')
-
-    # make dataset used by tensorflow and modify maps with noise, foregrounds and etc
-    dataset = make_dateset(model_params, base)
-
-    # don't load the whole dataset if you are training on less maps then that
-    # this was used for tests and shouldn't happen normally
-    # also make the dataset for the validation data
-    if model_params.train_number < len(base_val) and model_params.train_number > 0:
-        dataset_val = make_dateset(model_params, base)
-    else:
-        dataset_val = make_dateset(model_params, base_val)
-
-    print('Data fully loaded')
-    return(dataset, dataset_val)
-
 # load IMs, augment them with noise, foregrounds and etc and package into datasets for tensorflow
-def make_dateset(model_params, base):
+def make_dataset_lum(model_params, base):
     # time how long it takes to load data
     start = time.time()
     data = np.array([utf8FileToMapAndLum(x, model_params.luminosity_byproduct,
                                         model_params.ThreeD,
-                                        model_params.log_input,
-                                        model_params.make_map_noisy,
                                         model_params.pre_pool,
                                         model_params.pre_pool_z,
                                         model_params.lum_func_size) for x in base])
@@ -479,12 +441,23 @@ def make_dateset(model_params, base):
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
+    # apply a guassian filter over the map if requested
+    # used for when pixels are smaller then the beam size
     if model_params.gaussian_smoothing > 0:
         dataset = dataset.map(lambda x, y:
                             tuple(tf.py_func(apply_gaussian_smoothing_lum_wrapper, [x,
                                                                 y,
                                                                 model_params.gaussian_smoothing],
                                                                 [tf.float64, tf.float64])))
+
+    # apply a log-modulus function to the map to make it span a single order of magnitude
+    # this has to be after smoothing, the real map would be smoothed before it can be logged
+    if model_params.log_input:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(log_modulus_lum_wrapper, [x,
+                                                                y],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
 
     # repeat dataset when it goes through all maps
     dataset = dataset.repeat()
@@ -495,6 +468,138 @@ def make_dateset(model_params, base):
 
     return(dataset)
 
+# load IMs, augment them with noise, foregrounds and etc and package into datasets for tensorflow
+def make_dataset_foregrounds(model_params, base):
+    # time how long it takes to load data
+    start = time.time()
+    data = np.array([utf8FileToMap(x, model_params.ThreeD,
+                                        model_params.pre_pool,
+                                        model_params.pre_pool_z) for x in base])
+    end = time.time()
+    print('Time to load data:', end - start)
+
+    # split the IMs and luminosity functions (features and labels)
+    features = data #np.stack(data[:,0])
+    labels = np.array(features, copy=True)
+
+    # start making the dataset
+    dataset = tf.data.Dataset.from_tensor_slices((features, labels))
+    dataset = dataset.shuffle(buffer_size=len(features))
+
+    # do random augmentations if desired
+    if model_params.random_augmentation == True:
+        lumLogBinCents = loadLogBinCenters(base[0])
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(do_random_augmentation, [x,
+                                                                y,
+                                                                lumLogBinCents],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
+
+    # add in foregrounds if requested and switch the labels to being the foreground maps
+    if model_params.insert_foreground == True:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(add_foreground_noise_foreground_wrapper, [x,
+                                                                y,
+                                                                model_params.pix_x,
+                                                                model_params.pix_y,
+                                                                model_params.omega_pix,
+                                                                model_params.nu,
+                                                                model_params.pre_pool_z,
+                                                                0.1,
+                                                                model_params.random_foreground],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
+
+    # this adds gaussian noise to pre-processed maps
+    if model_params.make_map_noisy > 0:
+        if model_params.noise_limits[0] is not None:
+            noise = model_params.noise_limits
+        else:
+            noise = model_params.make_map_noisy
+
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(add_noise_after_pool_lum_wrapper, [x,
+                                                                y,
+                                                                noise,
+                                                                model_params.pre_pool,
+                                                                model_params.pre_pool_z,
+                                                                0.1],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
+
+    # apply a guassian filter over the map if requested
+    # used for when pixels are smaller then the beam size
+    if model_params.gaussian_smoothing > 0:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(apply_gaussian_smoothing_foreground_wrapper, [x,
+                                                                y,
+                                                                model_params.gaussian_smoothing],
+                                                                [tf.float64, tf.float64])))
+
+    # apply a log-modulus function to the map to make it span a single order of magnitude
+    # this has to be after smoothing, the real map would be smoothed before it can be logged
+    if model_params.log_input:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(log_modulus_foreground_wrapper, [x,
+                                                                y],
+                                                                [tf.float64, tf.float64])))#,
+                            #num_parallel_calls=24)
+
+    # repeat dataset when it goes through all maps
+    dataset = dataset.repeat()
+    # set the batch size to what was given in ModelParams
+    dataset = dataset.batch(model_params.batch_size)
+    # prefetch 2 maps at a time to help speed up loading maps onto GPUs
+    dataset = dataset.prefetch(2)
+
+    return(dataset)
+
+# load in data for training and package it for training
+def setup_datasets(model_params, make_dataset=make_dataset_lum):
+    print('Starting to load data...')
+    subFields = loadBaseFNames(model_params.mapLoc)
+
+    # set random seed so data is shuffeled the same way
+    # every time and then make the seed random
+    np.random.seed(1234)
+    np.random.shuffle(subFields)
+    np.random.seed()
+
+    # shuffle test and validation data
+    valPoint = int(len(subFields) * (1 - model_params.valPer))
+
+    # base file names for training data
+    base = [model_params.mapLoc + s for s in subFields[:valPoint]]
+
+    # only load a certain number of files if requested
+    if model_params.train_number > 0:
+        base = base[:model_params.train_number]
+
+    # base file names for validation data
+    base_val = [model_params.mapLoc + s for s in subFields[valPoint:]]
+
+    # shuffle the order of the maps
+    np.random.shuffle(base)
+    np.random.shuffle(base_val)
+
+    # put map information into our ModelParams object
+    model_params.get_map_info(base[0] + '_map.npz')
+
+    # make dataset used by tensorflow and modify maps with noise, foregrounds and etc
+    dataset = make_dataset(model_params, base)
+
+    # don't load the whole dataset if you are training on less maps then that
+    # this was used for tests and shouldn't happen normally
+    # also make the dataset for the validation data
+    if model_params.train_number < len(base_val) and model_params.train_number > 0:
+        dataset_val = make_dataset(model_params, base)
+    else:
+        dataset_val = make_dataset(model_params, base_val)
+
+    print('Data fully loaded')
+    return(dataset, dataset_val)
+
 # function to convert a base name into the map map_cube and the wanted luminosity byproduct
 def fileToMapAndLum(fName, lumByproduct='basic'):
     mapData, lumData = loadMapAndLum(fName, lumByproduct=lumByproduct)
@@ -502,8 +607,26 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
     return(mapData, lumData)
 
 # function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
-def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=False,
-    make_map_noisy=0, pre_pool=1, pre_pool_z=1, lum_func_size=None):
+def FileToMapAugments(mapData, ThreeD=False, pre_pool=1, pre_pool_z=1):
+    # pool the data if it is requested
+    if pre_pool > 1:
+        if len(mapData) % pre_pool == 0:
+            mapData = block_reduce(
+                mapData, (pre_pool, pre_pool, pre_pool_z), np.sum)
+        else:
+            pass
+
+    # give an extra dimension to the map if it is using 3d convolutions
+    if ThreeD:
+        # make sure to reshape the map data for the 3D convolutions
+        mapData = mapData.reshape(len(mapData), len(
+            mapData[0]), len(mapData[0][0]), 1)
+
+    return(mapData)
+
+# function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
+def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False,
+    pre_pool=1, pre_pool_z=1, lum_func_size=None):
 
     # be careful with strings sometime not being strings and needing to decode them
     if type(lumByproduct) is not str:
@@ -514,24 +637,8 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
     # load file name and luminosity byproduct type to map and luminosity byproduct type
     mapData, lumData = fileToMapAndLum(fName, lumByproduct)
 
-    # pool the data if it is requested
-    if pre_pool > 1:
-        if len(mapData) % pre_pool == 0:
-            mapData = block_reduce(
-                mapData, (pre_pool, pre_pool, pre_pool_z), np.sum)
-        else:
-            pass
-
-    # use a log of some sorts to make the IM values span a single order of magnitude
-    if log_input:
-        # mapData = np.log10(mapData + 1e-6) + 6
-        # mapData = log_map(mapData + 1e3) - 3
-        mapData = log_modulus(mapData)
-
-    # mean_map = np.mean(mapData)
-    # std_map = np.std(mapData)
-
-    # mapData = (mapData - mean_map)/std_map
+    # augment mapData if needed
+    mapData = FileToMapAugments(mapData, ThreeD, pre_pool, pre_pool_z)
 
     # decide if you want to use all luminosity values or a subset of them
     if lum_func_size is not None:
@@ -541,13 +648,22 @@ def utf8FileToMapAndLum(fName, lumByproduct='basic', ThreeD=False, log_input=Fal
         else:
             lumData = lumData[lum_func_size:]
 
-    # give an extra dimension to the map if it is using 3d convolutions
-    if ThreeD:
-        # make sure to reshape the map data for the 3D convolutions
-        mapData = mapData.reshape(len(mapData), len(
-            mapData[0]), len(mapData[0][0]), 1)
 
     return(mapData, lumData)
+
+# function to convert a utf-8 basename into the map map_cube
+def utf8FileToMap(fName, ThreeD=False, pre_pool=1, pre_pool_z=1):
+    # be careful with strings sometime not being strings and needing to decode them
+    if type(fName) is not str:
+        fName = fName.decode("utf-8")
+
+    # load file
+    mapData = loadMap(fName + '_map.npz')
+
+    # augment mapData if needed
+    mapData = FileToMapAugments(mapData, ThreeD, pre_pool, pre_pool_z)
+
+    return(mapData)
 
 # function to add noise to a map after it has already been pooled
 def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z, chance_to_not=0.0):
@@ -562,21 +678,13 @@ def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z, chance_t
                 sys.exit("A noise list was given that has more then 2 values.  Please only give a scalar or a list with a min and max")
             else:
                 make_map_noisy = np.random.uniform(make_map_noisy[0], make_map_noisy[1])
-                # print(make_map_noisy)
-
-        # Old way of doing noise (incorrect because noise can be negative)
-        # # Use central limit theorem and get a single draw for the noise
-        # # assume 160 draws is enough and my math is correct to get new mean and variance
-        # new_mean = shrink_size / np.sqrt(2*np.pi) * make_map_noisy
-        # new_std = np.sqrt(shrink_size / 2 * make_map_noisy**2 * (1 - 1/np.pi))
-        # noise = np.maximum(np.random.normal(new_mean, new_std, mapData.shape), 0)
 
         # new way of doing noise (noise can be negative)
         new_std = np.sqrt(shrink_size) * make_map_noisy
         noise = np.random.normal(0, new_std, mapData.shape)
 
         # add the noise to the map correctly
-        mapData = add_to_processed_map(mapData, noise)
+        mapData = mapData + noise
 
     return(mapData)
 
@@ -609,6 +717,14 @@ def apply_gaussian_smoothing_lum_wrapper(mapData, luminosity, gaussian_smoothing
     mapData = apply_gaussian_smoothing(mapData, gaussian_smoothing_sigma)
 
     return(mapData, luminosity)
+
+# function to apply guassian smoothing to a map and foreground map
+# wraps around function that doesn't take two maps data
+def apply_gaussian_smoothing_foreground_wrapper(mapData, foregrounds, gaussian_smoothing_sigma):
+    mapData = apply_gaussian_smoothing(mapData, gaussian_smoothing_sigma)
+    foregrounds = apply_gaussian_smoothing(foregrounds, gaussian_smoothing_sigma)
+
+    return(mapData, foregrounds)
 
 # function to randomly augment the training data
 # includes: setting everything to zero
@@ -673,11 +789,12 @@ def add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_n
         foreground = makeFGcube(int(Nx), int(Ny), omega_pix, nu, random_foreground_params=random_foreground_params)
 
         # reduce map in z direction
-        foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
+        if pre_pool_z > 1:
+            foreground = block_reduce(foreground, (1,1,pre_pool_z), np.sum)
         foreground = foreground.reshape(mapData.shape)
 
         # add foreground to current map
-        mapData = add_to_processed_map(mapData, foreground)
+        mapData = mapData + foreground
 
     return(mapData)
 
@@ -687,6 +804,18 @@ def add_foreground_noise_lum_wrapper(mapData, lumData, Nx, Ny, omega_pix, nu, pr
     mapData = add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=chance_to_not, random_foreground_params=random_foreground_params)
 
     return(mapData, lumData)
+
+# function to add foreground noise into an intensity map as well as returning the foreground map
+# wraps around function that doesn't take the fake_foreground data
+def add_foreground_noise_foreground_wrapper(mapData, fake_foreground, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=0.0, random_foreground_params=False):
+    # make an empty map and add foregrounds to it
+    empty = np.zeros(mapData.shape)
+    foreground = add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=chance_to_not, random_foreground_params=random_foreground_params)
+
+    # add foregrounds to real map
+    mapData = mapData + foreground
+
+    return(mapData, foreground)
 
 # make foreground data cube
 def makeFGcube(Nx,Ny,omega_pix,nu,N0=32.1,gamma=2.18,Smin=1,Smax=10**2.5,a0=0.39,sigma_a=0.33, random_foreground_params=False):
@@ -796,19 +925,28 @@ def log_map(cur_map):
 
 # function to add a map to a post-processed map
 def add_to_processed_map(old_map, new_map):
-    # old_map = np.log10(np.power(10, old_map-6) + new_map) + 6
-    # old_map = np.log10(np.power(10, old_map+3) + new_map) - 3
-
     old_map = log_modulus(undo_log_modulus(old_map) + new_map)
 
     return(old_map)
 
 # special function to take log of positive and negative values and still work
-# probably should use 1 instead of 1e-6 in the log and it wouldn't change anything
 def log_modulus(cur_map):
     cur_map = np.sign(cur_map) * np.log10(np.abs(cur_map) + 1)
 
     return(cur_map)
+
+# wrapper function for log_modulus used with dataset object
+def log_modulus_lum_wrapper(cur_map, lumData):
+    cur_map = log_modulus(cur_map)
+
+    return(cur_map, lumData)
+
+# wrapper function for log_modulus used with dataset object to log both inputs
+def log_modulus_foreground_wrapper(cur_map, foreground):
+    cur_map = log_modulus(cur_map)
+    foreground = log_modulus(foreground)
+
+    return(cur_map, foreground)
 
 # undoes the log_modulus function
 def undo_log_modulus(cur_map):
