@@ -110,10 +110,10 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
 
         # conv5
         for i in range(3):
-           strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-           x = residual_block(x, base_filters*2**4, base_filters*2**5,
-            _strides=strides,
-            use_bias=use_bias)
+          strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+          x = residual_block(x, base_filters*2**4, base_filters*2**5,
+           _strides=strides,
+           use_bias=use_bias)
 
         x = layers.GlobalAveragePooling3D()(x)
         x = layers.Dense(dense_layer)(x)
@@ -157,8 +157,7 @@ def get_master_res_next(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
 ### Res_NeXt2 ############################################################
 ##########################################################################
 ### lots of this taken from https://gist.github.com/mjdietzx/0cb95922aac14d446a6530f87b3a04ce
-def get_master_res_next2(model_params, extra_file_name='',
-                    give_weights=False, cardinality=1):
+def get_master_res_next2(model_params, extra_file_name='', give_weights=False, cardinality=1):
 
     # if hasattr(model_params, 'file_name'):
     try:
@@ -170,7 +169,7 @@ def get_master_res_next2(model_params, extra_file_name='',
     model = get_master_res_next(model_params.modelLoc, model_params.pix_x,
                 model_params.pix_y, model_params.numb_maps, model_params.lum_func_size,
                 extra_file_name=extra_file_name,
-                file_name=file_name ,
+                file_name=file_name,
                 train_number=model_params.train_number,
                 droprate=model_params.droprate,
                 base_filters=model_params.base_filters,
@@ -258,7 +257,7 @@ def get_master_res_next_small(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
             return y
 
         # conv1
-        x = layers.Conv3D(base_filters, kernel_size=(7, 7, 7), strides=(2, 2, 2),
+        x = layers.Conv3D(base_filters, kernel_size=(3, 3, 3), strides=(2, 2, 2),
             padding='same', use_bias=use_bias)(x)
         x = add_common_layers(x)
 
@@ -278,12 +277,12 @@ def get_master_res_next_small(modelLoc, pix_x, pix_y, numb_maps, lum_func_size,
                 _strides=strides,
                 use_bias=use_bias)
 
-        # conv4
-        for i in range(6):
-            strides = (2, 2, 2) if i == 0 else (1, 1, 1)
-            x = residual_block(x, base_filters*2**2, base_filters*2**3,
-                _strides=strides,
-                use_bias=use_bias)
+        # # conv4
+        # for i in range(6):
+        #     strides = (2, 2, 2) if i == 0 else (1, 1, 1)
+        #     x = residual_block(x, base_filters*2**2, base_filters*2**3,
+        #         _strides=strides,
+        #         use_bias=use_bias)
         #
         # # conv5
         # for i in range(3):
@@ -346,7 +345,7 @@ def get_master_res_next2_small(model_params, extra_file_name='', give_weights=Fa
     model = get_master_res_next_small(model_params.modelLoc, model_params.pix_x,
                 model_params.pix_y, model_params.numb_maps, model_params.lum_func_size,
                 extra_file_name=extra_file_name,
-                file_name=file_name ,
+                file_name=file_name,
                 train_number=model_params.train_number,
                 droprate=model_params.droprate,
                 base_filters=model_params.base_filters,
@@ -475,6 +474,8 @@ def get_master_res_next_u_net(modelLoc, pix_x, pix_y, numb_maps,
         x = layers.add([layer_1_short, x])
         x = residual_block(x, base_filters*2**layer, base_filters*2**layer, _project_shortcut=True)
         x = residual_block(x, base_filters*2**layer, base_filters*2**layer)
+        x = layers.Conv3DTranspose(filters=base_filters*2**layer, kernel_size=(1, 1, 2), strides=(1, 2, 2), padding='same')(x)
+
 
         x = layers.Conv3D(1, kernel_size=(1, 1, 1), strides=(1, 1, 1))(x)
 

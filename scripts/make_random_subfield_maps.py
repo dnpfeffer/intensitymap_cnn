@@ -5,7 +5,8 @@ import lnn as lnn
 
 ### set the location of the halo catalogs and maps
 haloLoc = '../catalogues2/'
-mapLoc = '../maps2/random_maps_small_map/'
+# mapLoc = '../maps2/random_maps_small_map/'
+mapLoc = '../maps2/test/'
 
 # size of LIM to use
 npix_x = 64

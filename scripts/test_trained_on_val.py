@@ -12,21 +12,61 @@ import lnn as lnn
 ### load in models
 from models_to_load import *
 
+# function to load validation maps from a given directory
+def load_validation(config_info, data_val_dict=None, base_val_dict=None):
+    # dict is used to store processed maps and can store maps from different directories
+    map_loc = config_info['map_loc']
+
+    # if no dict is given
+    if data_val_dict is None:
+        data_val_dict = {}
+        base_val_dict = {}
+    # directory was already loaded
+    elif map_loc in data_val_dict:
+        return(data_val_dict, base_val_dict)
+
+    # new directory to load
+    subFields = lnn.loadBaseFNames(map_loc)
+
+    # set random seed so data is shuffeled the same way
+    # every time and then make the seed random
+    np.random.seed(1234)
+    np.random.shuffle(subFields)
+    np.random.seed()
+
+    # get map locations
+    valPer = 0.2
+    valPoint = int(len(subFields) * (1 - valPer))
+    base_val_dict[map_loc] = [map_loc + s for s in subFields[valPoint:]]
+
+    # actually load and pre-process maps
+    data_val_dict[map_loc] = np.array([lnn.utf8FileToMapAndLum(x, config_info['luminosity_byproduct'],
+                                        config_info['threeD'],
+                                        config_info['pre_pool'],
+                                        config_info['pre_pool_z'],
+                                        config_info['lum_func_size']) for x in base_val_dict[map_loc]])
+
+    return(data_val_dict, base_val_dict)
+
+
 np.random.seed(1337)
 
 # read in the config file name
 parser = argparse.ArgumentParser()
 parser.add_argument('-fn', '--file_name', default='',
                             help='What file name to use for the config file')
+parser.add_argument('-pl', '--prediction_loc', default='',
+                            help='What directory to store the prediction in (within the prediction directory itself)')
 args = parser.parse_args()
 config_name = args.file_name
+extra_pred_loc = args.prediction_loc
 
 if config_name == '':
     sys.exit('Must give a config file name with -fn')
 
 # where to store things
 data_loc = '../data/'
-predict_loc = data_loc + 'predictions/'
+predict_loc = data_loc + 'predictions/' + extra_pred_loc + '/'
 
 # load in the config file
 config = configparser.ConfigParser()
@@ -36,53 +76,73 @@ models = config.sections()
 # defaults
 defaults = lnn.get_config_info(config, models[0])
 
-# start the work to load the validation maps
-cur_map_loc = config[models[0]]['map_loc']
-subFields = lnn.loadBaseFNames(cur_map_loc)
+# get the network architecture
+arch = defaults['model_arch']
 
-# set random seed so data is shuffeled the same way
-# every time and then make the seed random
-np.random.seed(1234)
-np.random.shuffle(subFields)
-np.random.seed()
+# # start the work to load the validation maps
+# cur_map_loc = config[models[0]]['map_loc']
+# subFields = lnn.loadBaseFNames(cur_map_loc)
 
-# get map locations
-valPer = 0.2
-valPoint = int(len(subFields) * (1 - valPer))
-base_val = [cur_map_loc + s for s in subFields[valPoint:]]
+# # set random seed so data is shuffeled the same way
+# # every time and then make the seed random
+# np.random.seed(1234)
+# np.random.shuffle(subFields)
+# np.random.seed()
 
-# debug
-# debug_map_numbs = 2
-# base_val = base_val[:debug_map_numbs]
+# # get map locations
+# valPer = 0.2
+# valPoint = int(len(subFields) * (1 - valPer))
+# base_val = [cur_map_loc + s for s in subFields[valPoint:]]
 
-# load in maps
-data_val = np.array([lnn.utf8FileToMapAndLum(x, defaults['luminosity_byproduct'],
-                                        defaults['threeD'],
-                                        defaults['log_input'],
-                                        defaults['make_map_noisy'],
-                                        defaults['pre_pool'],
-                                        defaults['pre_pool_z'],
-                                        defaults['lum_func_size']) for x in base_val])
+# # debug
+# # debug_map_numbs = 2
+# # base_val = base_val[:debug_map_numbs]
+
+# # load in maps
+# data_val = {}
+# data_val[cur_map_loc] = np.array([lnn.utf8FileToMapAndLum(x, defaults['luminosity_byproduct'],
+#                                         defaults['threeD'],
+#                                         defaults['pre_pool'],
+#                                         defaults['pre_pool_z'],
+#                                         defaults['lum_func_size']) for x in base_val])
+
+# dict to store maps
+data_val = {}
+base_val = {}
 
 # start iterating for each model
 for model_name in models:
+    print('Testing on ' + model_name)
     model_params = lnn.get_config_info(config, model_name)
+
+    # load maps if need be
+    data_val, base_val = load_validation(model_params, data_val_dict=data_val, base_val_dict=base_val)
 
     #print('Doing model {0}'.format(model_params['model_name']))
     #print(model_params)
 
-    model = get_master_res_next(model_params['model_loc'], model_params['pix_x'],
-                                model_params['pix_y'], model_params['pix_z'],
-                                model_params['lum_func_size'],
-                                extra_file_name='', file_name=model_params['model_name'],
-                                dense_layer=model_params['dense_layer'], base_filters=model_params['base_filters'],
-                                cardinality=model_params['cardinality'],
-                                give_weights=model_params['give_weights'], use_bias=model_params['use_bias'])
+    # load the correct model based on the given architecture
+    if arch == 'original':
+        model = get_master_res_next(model_params['model_loc'], model_params['pix_x'],
+                                    model_params['pix_y'], model_params['pix_z'],
+                                    model_params['lum_func_size'],
+                                    extra_file_name='', file_name=model_params['model_name'],
+                                    dense_layer=model_params['dense_layer'], base_filters=model_params['base_filters'],
+                                    cardinality=model_params['cardinality'],
+                                    give_weights=model_params['give_weights'], use_bias=model_params['use_bias'])
+    elif arch == 'small':
+        model = get_master_res_next_small(model_params['model_loc'], model_params['pix_x'],
+                                    model_params['pix_y'], model_params['pix_z'],
+                                    model_params['lum_func_size'],
+                                    extra_file_name='', file_name=model_params['model_name'],
+                                    dense_layer=model_params['dense_layer'], base_filters=model_params['base_filters'],
+                                    cardinality=model_params['cardinality'],
+                                    give_weights=model_params['give_weights'], use_bias=model_params['use_bias'])
 
     # dict to store everything
     stored_predictions = {}
 
-    for data, base in zip(data_val, base_val):
+    for data, base in zip(data_val[model_params['map_loc']], base_val[model_params['map_loc']]):
         cur_map = data[0]
         cur_lum = data[1]
 
@@ -102,7 +162,8 @@ for model_name in models:
         if model_params['add_foregrounds']:
             #print('adding foregrounds')
             model_params_obj = lnn.ModelParams()
-            model_params_obj.give_attributes(pre_pool=model_params['pre_pool'], pre_pool_z=model_params['pre_pool_z'])
+            model_params_obj.give_attributes(pre_pool=model_params['pre_pool'], pre_pool_z=model_params['pre_pool_z'],
+                pix_x=int(model_params['pix_x']*model_params['pre_pool']), pix_y=int(model_params['pix_y']*model_params['pre_pool']))
             model_params_obj.clean_parser_data()
             model_params_obj.get_map_info(base + '_map.npz')
 
@@ -120,6 +181,10 @@ for model_name in models:
         # do gaussian smoothing
         if model_params['gaussian_smoothing'] > 0:
             cur_map = lnn.apply_gaussian_smoothing(cur_map, model_params['gaussian_smoothing'])
+
+        # add a constant factor to the map
+        if model_params['constant_factor'] > 0:
+            cur_map = lnn.add_constant_factor(cur_map, model_params['constant_factor'])
 
         # apply log_modulus to make map span single order of magnitude
         if defaults['log_input']:

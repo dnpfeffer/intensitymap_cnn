@@ -91,6 +91,9 @@ class ModelParams:
         self.noise_limits = (None,None)
         self.random_foreground = False
         self.gaussian_smoothing = 0
+        self.constant_factor = 0
+        self.chance_of_no_foreground = 0.1
+        self.chance_of_no_noise = 0.1
 
     # setup command line parser arguments
     def setup_parser(self, parser):
@@ -174,7 +177,14 @@ class ModelParams:
                             help='Number of pixels in y-direction')
         parser.add_argument('-nms', '--numb_maps', type=int, default=self.numb_maps,
                             help='Number of maps used in a LIM')
-
+        parser.add_argument('-cf', '--constant_factor', type=int, default=self.constant_factor,
+                            help='Constant factor to add to maps')
+        parser.add_argument('-cnf', '--chance_of_no_foreground', type=float,
+                            default=self.chance_of_no_foreground,
+                            help='Chance to not put foregrounds in a map while training')
+        parser.add_argument('-cnn', '--chance_of_no_noise', type=float,
+                            default=self.chance_of_no_noise,
+                            help='Chance to not put white noise in a map while training')
 
         return()
 
@@ -216,6 +226,9 @@ class ModelParams:
         self.pix_x = args.pix_x
         self.pix_y = args.pix_y
         self.numb_maps = args.numb_maps
+        self.constant_factor = args.constant_factor
+        self.chance_of_no_foreground = args.chance_of_no_foreground
+        self.chance_of_no_noise = args.chance_of_no_noise
 
         return()
 
@@ -419,7 +432,7 @@ def make_dataset_lum(model_params, base):
                                                                 model_params.omega_pix,
                                                                 model_params.nu,
                                                                 model_params.pre_pool_z,
-                                                                0.1,
+                                                                model_params.chance_of_no_foreground,
                                                                 model_params.random_foreground],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
@@ -437,7 +450,7 @@ def make_dataset_lum(model_params, base):
                                                                 noise,
                                                                 model_params.pre_pool,
                                                                 model_params.pre_pool_z,
-                                                                0.1],
+                                                                0.15],
                                                                 [tf.float64, tf.float64])))#,
                             #num_parallel_calls=24)
 
@@ -448,6 +461,15 @@ def make_dataset_lum(model_params, base):
                             tuple(tf.py_func(apply_gaussian_smoothing_lum_wrapper, [x,
                                                                 y,
                                                                 model_params.gaussian_smoothing],
+                                                                [tf.float64, tf.float64])))
+
+    # add a constant factor to every voxel in the map
+    # try to make all values positive
+    if model_params.constant_factor > 0:
+        dataset = dataset.map(lambda x, y:
+                            tuple(tf.py_func(add_constant_factor_lum_wrapper, [x,
+                                                                y,
+                                                                model_params.constant_factor],
                                                                 [tf.float64, tf.float64])))
 
     # apply a log-modulus function to the map to make it span a single order of magnitude
@@ -609,10 +631,14 @@ def fileToMapAndLum(fName, lumByproduct='basic'):
 # function to convert a utf-8 basename into the map map_cube and the luminosity byproduct
 def FileToMapAugments(mapData, ThreeD=False, pre_pool=1, pre_pool_z=1):
     # pool the data if it is requested
-    if pre_pool > 1:
+    if pre_pool > 1 or pre_pool_z > 1:
         if len(mapData) % pre_pool == 0:
             mapData = block_reduce(
                 mapData, (pre_pool, pre_pool, pre_pool_z), np.sum)
+            # mapData = block_reduce(
+            #     mapData, (pre_pool, pre_pool, 1), np.mean)
+            # mapData = block_reduce(
+            #     mapData, (1, 1, pre_pool_z), np.sum)
         else:
             pass
 
@@ -693,6 +719,17 @@ def add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z, chance_t
 def add_noise_after_pool_lum_wrapper(mapData, luminosity, make_map_noisy, pre_pool, pre_pool_z, chance_to_not=0.0):
     mapData = add_noise_after_pool(mapData, make_map_noisy, pre_pool, pre_pool_z,
         chance_to_not=chance_to_not)
+
+    return(mapData, luminosity)
+
+# function to add a constant factor to a map
+def add_constant_factor(mapData, factor=150):
+    mapData = mapData + factor
+
+    return(mapData)
+
+def add_constant_factor_lum_wrapper(mapData, luminosity, factor):
+    mapData = add_constant_factor(mapData, factor)
 
     return(mapData, luminosity)
 
@@ -810,7 +847,7 @@ def add_foreground_noise_lum_wrapper(mapData, lumData, Nx, Ny, omega_pix, nu, pr
 def add_foreground_noise_foreground_wrapper(mapData, fake_foreground, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=0.0, random_foreground_params=False):
     # make an empty map and add foregrounds to it
     empty = np.zeros(mapData.shape)
-    foreground = add_foreground_noise(mapData, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=chance_to_not, random_foreground_params=random_foreground_params)
+    foreground = add_foreground_noise(empty, Nx, Ny, omega_pix, nu, pre_pool_z, chance_to_not=chance_to_not, random_foreground_params=random_foreground_params)
 
     # add foregrounds to real map
     mapData = mapData + foreground
@@ -1041,6 +1078,7 @@ def get_config_info(config, model_name):
 
     # read in data from config file
     model_params['file_name'] = config[model_name]['file_name']
+    model_params['model_arch'] = config[model_name]['model_arch']
     model_params['model_name'] = config[model_name]['model_name']
     model_params['model_loc'] = config[model_name]['model_loc']
     model_params['map_loc'] = config[model_name]['map_loc']
@@ -1066,6 +1104,7 @@ def get_config_info(config, model_name):
     model_params['geometric_noise'] = config[model_name].getboolean('geometric_noise')
     model_params['only_bright'] = config[model_name].getboolean('only_bright')
     model_params['gaussian_smoothing'] = float(config[model_name]['gaussian_smoothing'])
+    model_params['constant_factor'] = float(config[model_name]['constant_factor'])
 
     # manage if random noise is requested
     if model_params['make_map_noisy2'] != 0:
