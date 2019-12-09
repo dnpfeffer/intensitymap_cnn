@@ -33,6 +33,10 @@ def map_to_pspec(map,cosmo, **kw):
     # assume comoving transverse distance = comoving distance
     # (i.e. no curvature)
 
+    # print(x, y, z)
+    # print(t)
+    # print(zco)
+
     avg_ctd = np.mean(zco)
     xco     = x/(180)*np.pi*avg_ctd
     yco     = y/(180)*np.pi*avg_ctd

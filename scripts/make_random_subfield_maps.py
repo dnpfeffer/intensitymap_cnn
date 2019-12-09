@@ -5,19 +5,18 @@ import lnn as lnn
 
 ### set the location of the halo catalogs and maps
 haloLoc = '../catalogues2/'
-# mapLoc = '../maps2/random_maps_small_map/'
-mapLoc = '../maps2/test/'
+mapLoc = '../maps2/random_small_Li_small_map/'
 
 # size of LIM to use
 npix_x = 64
 npix_y = 64
-nmaps = 10
+nmaps = 100
 
 ### what noise level to use
 noise = 0
 
 ### to use base coefficients for the model or not
-default = True
+default = False
 
 ### make sure the map directory exists
 lnn.checkDirectoryPath(mapLoc)

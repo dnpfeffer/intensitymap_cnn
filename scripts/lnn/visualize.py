@@ -87,7 +87,7 @@ def history_compare_two_metrics(history, metrics=['loss', 'mean_squared_error'],
 def test_model(model, base, base_number, luminosity_byproduct='log', threeD=False, evaluate=True,
     log_input=False, make_map_noisy=0, pre_pool=1, pre_pool_z=25, lum_func_size=None,
     add_foregrounds=False, random_foreground_params=False, rotate=0,
-    gaussian_smoothing=0):
+    gaussian_smoothing=0, pix_x=256, pix_y=256):
 
     # get the simulated map and luminosity byproduct
     cur_map, cur_lum = fileToMapAndLum(base[base_number], luminosity_byproduct)
@@ -114,7 +114,8 @@ def test_model(model, base, base_number, luminosity_byproduct='log', threeD=Fals
     # add in foregrounds
     if add_foregrounds:
         model_params = ModelParams()
-        model_params.give_attributes(pre_pool=4, pre_pool_z=10)
+        model_params.give_attributes(pre_pool=pre_pool, pre_pool_z=pre_pool_z,
+            pix_x=pix_x, pix_y=pix_y)
         model_params.clean_parser_data()
         model_params.get_map_info(base[base_number] + '_map.npz')
 
@@ -422,10 +423,14 @@ class Prediction:
         # loop over each map tested and each luminosity in said map
         for i, key in enumerate(self.keys):
             for j, val in enumerate(self.predictions[key][0]):
-                if self.predictions[key][1][j] == 0.0 and self.predictions[key][0][j] != 0.0:
+                if (self.predictions[key][1][j] == 0.0 and self.predictions[key][0][j] != 0.0):
                     res_ratio[i,j] = None
+                elif (self.predictions[key][1][j] == 0.0 and self.predictions[key][0][j] == 0.0):
+                    res_ratio[i,j] = 0
                 else:
                     res_ratio[i,j] = (self.predictions[key][0][j]-self.predictions[key][1][j]) / self.predictions[key][1][j]
+                # if j == 0:
+                #     print(self.predictions[key][0][j], self.predictions[key][1][j])
 
         # get results out of log space
         transformed_res_ratio = np.zeros([len(self.keys), len(self.predictions[self.keys[0]][0])])
@@ -457,12 +462,17 @@ class Prediction:
         transformed_res_conf_interval = []
         transformed_res_median = []
 
+        # print(self.res_ratio[0])
+
         # do calculation of confidence interval for normal (unlogged) data
         for i, key in enumerate(self.res_ratio[0]):
             # sort list of residuals for a given luminosity
             sorted_res = np.array(sorted(self.res_ratio[:,i]))
             # remove nans if needed
             sorted_res = sorted(sorted_res[~np.isnan(sorted_res)])
+
+            # print(self.res_ratio[:,i])
+            # print(i, sorted_res)
 
             # get length of list to remove 5%
             map_numb = len(sorted_res)
